@@ -328,19 +328,27 @@ export const BinanceTab: React.FC = () => {
             '#': index + 1,
             'ID': order.orderId,
             'Type': order.type === 'BUY' ? 'Buy' : 'Sell',
-            'EGP': order.fiatAmount.toFixed(2),
-            'Usdt B': order.cryptoAmount.toFixed(2),
-            'USDT': order.fee === 0 ? 
-                (order.type === 'BUY' ? 
-                    (order.cryptoAmount - 0.05).toFixed(2) : 
-                    (order.cryptoAmount + 0.05).toFixed(2)) : 
-                order.actualUsdt.toFixed(2),
-            'Price': order.fee === 0 ? 
-                (order.type === 'BUY' ? 
-                    (order.fiatAmount / (order.cryptoAmount - 0.05)).toFixed(3) : 
-                    (order.fiatAmount / (order.cryptoAmount + 0.05)).toFixed(3)) : 
-                (order.fiatAmount / order.actualUsdt).toFixed(3),
-            'Fees': order.fee === 0 ? '0.05 🔄' : order.fee.toFixed(2),
+            'EGP': { v: order.fiatAmount, t: 'n', z: '#,##0.00' },
+            'Usdt B': { v: order.cryptoAmount, t: 'n', z: '#,##0.00' },
+            'USDT': { 
+                v: order.fee === 0 ? 
+                    (order.type === 'BUY' ? 
+                        (order.cryptoAmount - 0.05) : 
+                        (order.cryptoAmount + 0.05)) : 
+                    order.actualUsdt,
+                t: 'n',
+                z: '#,##0.00'
+            },
+            'Price': { 
+                v: order.fee === 0 ? 
+                    (order.type === 'BUY' ? 
+                        (order.fiatAmount / (order.cryptoAmount - 0.05)) : 
+                        (order.fiatAmount / (order.cryptoAmount + 0.05))) : 
+                    (order.fiatAmount / order.actualUsdt),
+                t: 'n',
+                z: '#,##0.000'
+            },
+            'Fees': { v: order.fee === 0 ? 0.05 : order.fee, t: 'n', z: '#,##0.00' },
             'Status': order.status,
             'Date': new Date(order.createTime).toLocaleString('en-GB', { hour12: false })
         }));
@@ -350,30 +358,32 @@ export const BinanceTab: React.FC = () => {
             '#': exportData.length + 1,
             'ID': 'Total',
             'Type': '',
-            'EGP': totalEGP.toFixed(2),
-            'Usdt B': totalUsdtB.toFixed(2),
-            'USDT': totalUSDT.toFixed(2),
-            'Price': averagePrice.toFixed(2),
-            'Fees': totalFees.toFixed(2),
-            'Status': 'COMPLETED' as const,
+            'EGP': { v: totalEGP, t: 'n', z: '#,##0.00' },
+            'Usdt B': { v: totalUsdtB, t: 'n', z: '#,##0.00' },
+            'USDT': { v: totalUSDT, t: 'n', z: '#,##0.00' },
+            'Price': { v: averagePrice, t: 'n', z: '#,##0.000' },
+            'Fees': { v: totalFees, t: 'n', z: '#,##0.00' },
+            'Status': 'COMPLETED',
             'Date': ''
         });
 
         // إنشاء ورقة عمل جديدة
-        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const worksheet = XLSX.utils.json_to_sheet(exportData, {
+            header: ['#', 'ID', 'Type', 'EGP', 'Usdt B', 'USDT', 'Price', 'Fees', 'Status', 'Date']
+        });
 
         // تعديل عرض الأعمدة
         const columnWidths = [
-            { wch: 5 },
-            { wch: 15 },
-            { wch: 8 },
-            { wch: 12 },
-            { wch: 10 },
-            { wch: 10 },
-            { wch: 10 },
-            { wch: 8 },
-            { wch: 12 },
-            { wch: 20 }
+            { wch: 5 },  // #
+            { wch: 15 }, // ID
+            { wch: 8 },  // Type
+            { wch: 12 }, // EGP
+            { wch: 10 }, // Usdt B
+            { wch: 10 }, // USDT
+            { wch: 10 }, // Price
+            { wch: 8 },  // Fees
+            { wch: 12 }, // Status
+            { wch: 20 }  // Date
         ];
         worksheet['!cols'] = columnWidths;
 

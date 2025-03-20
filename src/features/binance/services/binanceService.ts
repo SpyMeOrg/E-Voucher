@@ -54,41 +54,35 @@ export class BinanceService {
     }
 
     private async makeRequest(endpoint: string, params: Record<string, string> = {}) {
-        try {
-            console.log('Checking server time...');
-            const response = await fetch(this.baseUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'Origin': window.location.origin
-                },
-                credentials: 'include',
-                mode: 'cors',
-                body: JSON.stringify({
-                    apiKey: this.apiKey,
-                    secretKey: this.secretKey,
-                    endpoint,
-                    params
-                }),
-            });
+        const response = await fetch(this.baseUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Origin': window.location.origin
+            },
+            credentials: 'include',
+            mode: 'cors',
+            body: JSON.stringify({
+                apiKey: this.apiKey,
+                secretKey: this.secretKey,
+                endpoint,
+                params
+            }),
+        });
 
-            if (!response.ok) {
-                const text = await response.text();
-                console.error('API Error Response:', text);
-                throw new Error(`خطأ في الاتصال: ${response.status}`);
-            }
-
+        if (!response.ok) {
             const text = await response.text();
-            try {
-                return JSON.parse(text);
-            } catch (e) {
-                console.error('Failed to parse response:', text);
-                throw new Error('تنسيق الاستجابة غير صالح');
-            }
-        } catch (error) {
-            console.error('Error in makeRequest:', error);
-            throw error;
+            console.error('API Error Response:', text);
+            throw new Error(`خطأ في الاتصال: ${response.status}`);
+        }
+
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Failed to parse response:', text);
+            throw new Error('تنسيق الاستجابة غير صالح');
         }
     }
 
