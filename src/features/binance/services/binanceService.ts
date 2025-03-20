@@ -56,6 +56,7 @@ export class BinanceService {
     async checkServerTime(): Promise<number> {
         return this.retryRequest(async () => {
             try {
+                console.log('Checking server time...');
                 const response = await fetch(this.baseUrl, {
                     method: 'POST',
                     headers: {
@@ -68,20 +69,24 @@ export class BinanceService {
                     }),
                 });
 
+                console.log('Server time response status:', response.status);
+                const data = await response.json();
+                console.log('Server time response:', data);
+
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'خطأ في الاتصال مع السيرفر');
+                    const error = data.error || 'خطأ في الاتصال مع السيرفر';
+                    console.error('Server time error:', error);
+                    throw new Error(error);
                 }
 
-                const data = await response.json();
-                
-                if (!data.serverTime) {
-                    throw new Error('تنسيق استجابة غير متوقع من السيرفر');
+                if (typeof data.serverTime !== 'number') {
+                    console.error('Invalid server time format:', data);
+                    throw new Error('تنسيق وقت السيرفر غير صالح');
                 }
 
                 return data.serverTime;
             } catch (error) {
-                console.error('خطأ في الحصول على وقت السيرفر:', error);
+                console.error('Error in checkServerTime:', error);
                 throw error;
             }
         });
@@ -100,6 +105,7 @@ export class BinanceService {
     async getP2POrders(params: P2POrderParams = {}) {
         return this.retryRequest(async () => {
             try {
+                console.log('Fetching P2P orders with params:', params);
                 const timestamp = Date.now();
                 await this.validateTimestamp(timestamp);
 
@@ -128,6 +134,7 @@ export class BinanceService {
                     requestParams.tradeType = params.tradeType;
                 }
 
+                console.log('Making P2P orders request with params:', requestParams);
                 const response = await fetch(this.baseUrl, {
                     method: 'POST',
                     headers: {
@@ -141,24 +148,27 @@ export class BinanceService {
                     }),
                 });
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    if (errorData.error && errorData.error.includes('restricted location')) {
-                        throw new Error('هذه الخدمة غير متاحة في منطقتك. يرجى استخدام VPN.');
-                    }
-                    throw new Error(errorData.error || 'خطأ في جلب الأوردرات');
-                }
-
+                console.log('P2P orders response status:', response.status);
                 const data = await response.json();
+                console.log('P2P orders response:', data);
 
-                if (!data || !Array.isArray(data.data)) {
-                    throw new Error('البيانات المستلمة غير صالحة');
+                if (!response.ok) {
+                    const error = data.error || 'خطأ في جلب الأوردرات';
+                    console.error('P2P orders error:', error);
+                    throw new Error(error);
                 }
 
-                return this.transformOrders(data.data);
+                if (!data || !data.data || !Array.isArray(data.data)) {
+                    console.error('Invalid P2P orders format:', data);
+                    throw new Error('تنسيق البيانات المستلمة غير صالح');
+                }
+
+                const transformedOrders = this.transformOrders(data.data);
+                console.log('Transformed orders:', transformedOrders);
+                return transformedOrders;
 
             } catch (error) {
-                console.error('خطأ في getP2POrders:', error);
+                console.error('Error in getP2POrders:', error);
                 throw error;
             }
         });

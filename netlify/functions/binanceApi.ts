@@ -3,6 +3,8 @@ import fetch from 'node-fetch';
 import crypto from 'crypto';
 import https from 'https';
 
+// استخدام proxy لتجاوز القيود الجغرافية
+const PROXY_URL = 'https://api.allorigins.win/raw?url=';
 const BINANCE_API_URL = 'https://api.binance.com';
 
 // إنشاء وكيل HTTPS مع خيارات مخصصة
@@ -77,62 +79,99 @@ export const handler: Handler = async (event) => {
 
     const requestUrl = `${BINANCE_API_URL}${endpoint}?${queryParams.toString()}`;
     
+    console.log('Making request to:', requestUrl);
+
     const response = await fetch(requestUrl, {
       method: 'GET',
       headers: {
         'X-MBX-APIKEY': apiKey,
-        'User-Agent': 'Mozilla/5.0', // إضافة User-Agent header
+        'User-Agent': 'Mozilla/5.0',
         'Accept': 'application/json'
       },
-      agent, // استخدام الوكيل المخصص
-      timeout: 30000 // زيادة مهلة الانتظار إلى 30 ثانية
+      agent,
+      timeout: 30000
     });
 
-    const responseText = await response.text();
-    
-    try {
-      const data = JSON.parse(responseText);
-      
-      // التحقق من رسائل الخطأ المحددة من Binance
-      if (data.code && data.msg) {
-        if (data.code === -1022) {
-          throw new Error('Signature for this request is not valid');
-        } else if (data.code === -2015) {
-          throw new Error('API-key format invalid');
-        } else if (data.code === -2014) {
-          throw new Error('API-key invalid');
-        } else if (data.code === -1021) {
-          throw new Error('Timestamp for this request was 1000ms ahead of the server\'s time');
-        }
-        
-        throw new Error(data.msg);
-      }
+    console.log('Response status:', response.status);
+    console.log('Response headers:', response.headers);
 
-      return {
-        statusCode: response.status,
-        headers,
-        body: JSON.stringify(data)
-      };
+    const responseText = await response.text();
+    console.log('Raw response:', responseText);
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
     } catch (parseError) {
-      console.error('Error parsing response:', parseError);
-      throw new Error('Invalid response format from Binance');
+      console.error('Failed to parse response:', parseError);
+      return {
+        statusCode: 502,
+        headers,
+        body: JSON.stringify({
+          error: 'Invalid response format from Binance API',
+          rawResponse: responseText
+        })
+      };
     }
+
+    if (data.code && data.msg) {
+      console.log('Binance error response:', data);
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          error: data.msg,
+          code: data.code
+        })
+      };
+    }
+
+    // التحقق من نوع الاستجابة بناءً على نقطة النهاية
+    if (endpoint === '/api/v3/time') {
+      if (typeof data.serverTime !== 'number') {
+        console.error('Invalid server time response:', data);
+        return {
+          statusCode: 502,
+          headers,
+          body: JSON.stringify({
+            error: 'Invalid server time response format',
+            data
+          })
+        };
+      }
+    } else if (endpoint.includes('orderMatch/listUserOrderHistory')) {
+      if (!data.data || !Array.isArray(data.data)) {
+        console.error('Invalid orders response:', data);
+        return {
+          statusCode: 502,
+          headers,
+          body: JSON.stringify({
+            error: 'Invalid orders response format',
+            data
+          })
+        };
+      }
+    }
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(data)
+    };
 
   } catch (error) {
     console.error('Error in binanceApi function:', error);
     
-    // تحسين رسائل الخطأ
     let errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     let statusCode = 500;
 
-    if (errorMessage.includes('ECONNREFUSED')) {
+    if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ECONNRESET')) {
       errorMessage = 'Could not connect to Binance API';
       statusCode = 503;
     } else if (errorMessage.includes('timeout')) {
       errorMessage = 'Request timed out';
       statusCode = 504;
     } else if (errorMessage.includes('restricted location')) {
-      errorMessage = 'This service is not available in your region. Please use a VPN.';
+      errorMessage = 'This service is not available in your region. Please try again later.';
       statusCode = 451;
     }
 
