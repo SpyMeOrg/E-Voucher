@@ -3,7 +3,9 @@ import fetch from 'node-fetch';
 import crypto from 'crypto';
 import https from 'https';
 
+// تحديث عنوان API بناءً على نوع الطلب
 const BINANCE_API_URL = 'https://api.binance.com';
+const BINANCE_DATA_API_URL = 'https://data.binance.com';
 
 const agent = new https.Agent({
   keepAlive: true,
@@ -22,6 +24,26 @@ const createSignature = (queryString: string, secretKey: string): string => {
     .createHmac('sha256', secretKey)
     .update(queryString)
     .digest('hex');
+};
+
+// تحديد ما إذا كان الطلب للقراءة فقط
+const isReadOnlyEndpoint = (endpoint: string): boolean => {
+  const readOnlyEndpoints = [
+    '/api/v3/time',
+    '/api/v3/ticker',
+    '/api/v3/ticker/24hr',
+    '/api/v3/ticker/price',
+    '/api/v3/ticker/bookTicker',
+    '/api/v3/exchangeInfo',
+    '/api/v3/depth',
+    '/api/v3/trades',
+    '/api/v3/historicalTrades',
+    '/api/v3/aggTrades',
+    '/api/v3/klines',
+    '/api/v3/avgPrice',
+    '/api/v3/ping'
+  ];
+  return readOnlyEndpoints.some(e => endpoint.startsWith(e));
 };
 
 export const handler: Handler = async (event) => {
@@ -69,11 +91,13 @@ export const handler: Handler = async (event) => {
       throw new Error('API Key and Secret Key are required');
     }
 
-    let requestUrl = `${BINANCE_API_URL}${endpoint}`;
+    // اختيار النطاق المناسب بناءً على نوع الطلب
+    const baseUrl = isReadOnlyEndpoint(endpoint) ? BINANCE_DATA_API_URL : BINANCE_API_URL;
+    let requestUrl = `${baseUrl}${endpoint}`;
     console.log('Request URL:', requestUrl);
 
     if (endpoint === '/api/v3/time') {
-      requestUrl = `${BINANCE_API_URL}/api/v3/time`;
+      requestUrl = `${baseUrl}/api/v3/time`;
     } else {
       const timestamp = Date.now();
       const queryParams = new URLSearchParams({
@@ -95,7 +119,7 @@ export const handler: Handler = async (event) => {
       'Content-Type': 'application/json'
     };
 
-    if (endpoint !== '/api/v3/time') {
+    if (!isReadOnlyEndpoint(endpoint)) {
       requestHeaders['X-MBX-APIKEY'] = apiKey;
     }
 
