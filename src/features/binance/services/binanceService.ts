@@ -25,10 +25,10 @@ export class BinanceService {
     constructor(apiKey: string, secretKey: string) {
         this.apiKey = apiKey;
         this.secretKey = secretKey;
-        // تحديد العنوان بناءً على بيئة التشغيل
+        // تحديث العنوان بناءً على بيئة التشغيل
         this.baseUrl = window.location.hostname === 'localhost' 
-            ? 'http://localhost:9999/.netlify/functions/binanceApi'
-            : '/.netlify/functions/binanceApi';
+            ? 'http://localhost:8888/.netlify/functions/binanceApi'
+            : `${window.location.origin}/.netlify/functions/binanceApi`;
     }
 
     private async retryRequest<T>(requestFn: () => Promise<T>): Promise<T> {
@@ -53,32 +53,45 @@ export class BinanceService {
         throw lastError || new Error('Maximum retry attempts reached');
     }
 
+    private async makeRequest(endpoint: string, params: Record<string, string> = {}) {
+        const response = await fetch(this.baseUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Origin': window.location.origin
+            },
+            credentials: 'include',
+            mode: 'cors',
+            body: JSON.stringify({
+                apiKey: this.apiKey,
+                secretKey: this.secretKey,
+                endpoint,
+                params
+            }),
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            console.error('API Error Response:', text);
+            throw new Error(`خطأ في الاتصال: ${response.status}`);
+        }
+
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Failed to parse response:', text);
+            throw new Error('تنسيق الاستجابة غير صالح');
+        }
+    }
+
     async checkServerTime(): Promise<number> {
         return this.retryRequest(async () => {
             try {
                 console.log('Checking server time...');
-                const response = await fetch(this.baseUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        apiKey: this.apiKey,
-                        secretKey: this.secretKey,
-                        endpoint: '/api/v3/time'
-                    }),
-                });
-
-                console.log('Server time response status:', response.status);
-                const data = await response.json();
-                console.log('Server time response:', data);
-
-                if (!response.ok) {
-                    const error = data.error || 'خطأ في الاتصال مع السيرفر';
-                    console.error('Server time error:', error);
-                    throw new Error(error);
-                }
-
+                const data = await this.makeRequest('/api/v3/time');
+                
                 if (!data || typeof data.serverTime !== 'number') {
                     console.error('Invalid server time format:', data);
                     throw new Error('تنسيق وقت السيرفر غير صالح');
@@ -148,7 +161,10 @@ export class BinanceService {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                     },
+                    credentials: 'include',
+                    mode: 'cors',
                     body: JSON.stringify({
                         apiKey: this.apiKey,
                         secretKey: this.secretKey,

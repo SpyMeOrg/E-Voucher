@@ -6,18 +6,33 @@
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["node-fetch"]
+  directory = "netlify/functions"
 
 [dev]
+  autoLaunch = false
   framework = "#custom"
-  command = "npm run dev:frontend"
-  targetPort = 3000
-  port = 3000
+  command = "npm run dev"
+  targetPort = 3002
+  port = 8888
   publish = "dist"
   functions = "netlify/functions"
-  functionsPort = 9999
+  functionsPort = 3001
 
 [[redirects]]
-  from = "/.netlify/functions/*"
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
-  force = true 
+  force = true
+
+[[headers]]
+  for = "/*"
+    [headers.values]
+    Access-Control-Allow-Origin = "https://evoucher.netlify.app"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Accept, Origin, X-MBX-APIKEY"
+    Access-Control-Allow-Credentials = "true" 

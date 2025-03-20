@@ -25,15 +25,29 @@ const createSignature = (queryString: string, secretKey: string): string => {
 };
 
 export const handler: Handler = async (event) => {
+  // تكوين رؤوس CORS بناءً على البيئة
+  const origin = event.headers.origin || '';
+  const allowedOrigins = [
+    'http://localhost:3002',
+    'http://localhost:3000',
+    'https://evoucher.netlify.app'
+  ];
+
   const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Origin': allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Accept, Origin, X-MBX-APIKEY',
+    'Access-Control-Allow-Credentials': 'true',
     'Content-Type': 'application/json'
   };
 
+  // معالجة طلبات OPTIONS مباشرة
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+    return {
+      statusCode: 204,
+      headers,
+      body: ''
+    };
   }
 
   if (event.httpMethod !== 'POST') {
@@ -56,8 +70,8 @@ export const handler: Handler = async (event) => {
     }
 
     let requestUrl = `${BINANCE_API_URL}${endpoint}`;
+    console.log('Request URL:', requestUrl);
 
-    // معالجة خاصة لطلب وقت الخادم
     if (endpoint === '/api/v3/time') {
       requestUrl = `${BINANCE_API_URL}/api/v3/time`;
     } else {
@@ -85,8 +99,6 @@ export const handler: Handler = async (event) => {
       requestHeaders['X-MBX-APIKEY'] = apiKey;
     }
 
-    console.log('Request headers:', requestHeaders);
-
     const response = await fetch(requestUrl, {
       method: 'GET',
       headers: requestHeaders,
@@ -95,44 +107,16 @@ export const handler: Handler = async (event) => {
     });
 
     console.log('Response status:', response.status);
-    console.log('Response headers:', response.headers.raw());
-
     const responseText = await response.text();
     console.log('Raw response:', responseText);
 
     try {
       const data = JSON.parse(responseText);
-
-      // التحقق من وجود خطأ في الرد
-      if (data.code && data.msg) {
-        console.log('Binance error response:', data);
-        return {
-          statusCode: response.status,
-          headers,
-          body: JSON.stringify({
-            error: data.msg,
-            code: data.code
-          })
-        };
-      }
-
-      // التحقق من صحة البيانات
-      if (endpoint === '/api/v3/time') {
-        if (typeof data.serverTime !== 'number') {
-          throw new Error('Invalid server time response format');
-        }
-      } else if (endpoint.includes('orderMatch/listUserOrderHistory')) {
-        if (!data.data || !Array.isArray(data.data)) {
-          throw new Error('Invalid orders response format');
-        }
-      }
-
       return {
         statusCode: response.status,
         headers,
         body: JSON.stringify(data)
       };
-
     } catch (parseError) {
       console.error('Failed to parse response:', parseError);
       return {
@@ -147,24 +131,11 @@ export const handler: Handler = async (event) => {
 
   } catch (error) {
     console.error('Error in binanceApi function:', error);
-    
-    let errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    let statusCode = 500;
-
-    if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ECONNRESET')) {
-      errorMessage = 'Could not connect to Binance API';
-      statusCode = 503;
-    } else if (errorMessage.includes('timeout')) {
-      errorMessage = 'Request timed out';
-      statusCode = 504;
-    }
-
     return {
-      statusCode,
+      statusCode: 500,
       headers,
       body: JSON.stringify({ 
-        error: errorMessage,
-        details: error instanceof Error ? error.stack : undefined
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       })
     };
   }
