@@ -64,27 +64,32 @@ export const handler: Handler = async (event) => {
       throw new Error('API Key and Secret Key are required');
     }
 
-    const timestamp = Date.now();
-    const queryParams = new URLSearchParams({
-      ...params,
-      timestamp: timestamp.toString(),
-      recvWindow: '60000'
-    });
+    let requestUrl = `${BINANCE_API_URL}${endpoint}`;
+    let queryString = '';
 
-    // إضافة signature فقط إذا لم تكن نقطة النهاية هي /api/v3/time
-    if (!endpoint.includes('/api/v3/time')) {
+    // معالجة خاصة لطلب وقت الخادم
+    if (endpoint === '/api/v3/time') {
+      requestUrl = `${BINANCE_API_URL}/api/v3/time`;
+    } else {
+      const timestamp = Date.now();
+      const queryParams = new URLSearchParams({
+        ...params,
+        timestamp: timestamp.toString(),
+        recvWindow: '60000'
+      });
+
       const signature = createSignature(queryParams.toString(), secretKey);
       queryParams.append('signature', signature);
+      queryString = `?${queryParams.toString()}`;
+      requestUrl += queryString;
     }
 
-    const requestUrl = `${BINANCE_API_URL}${endpoint}?${queryParams.toString()}`;
-    
     console.log('Making request to:', requestUrl);
 
     const response = await fetch(requestUrl, {
       method: 'GET',
       headers: {
-        'X-MBX-APIKEY': apiKey,
+        ...(endpoint !== '/api/v3/time' ? { 'X-MBX-APIKEY': apiKey } : {}),
         'User-Agent': 'Mozilla/5.0',
         'Accept': 'application/json'
       },
@@ -93,7 +98,7 @@ export const handler: Handler = async (event) => {
     });
 
     console.log('Response status:', response.status);
-    console.log('Response headers:', response.headers);
+    console.log('Response headers:', response.headers.raw());
 
     const responseText = await response.text();
     console.log('Raw response:', responseText);

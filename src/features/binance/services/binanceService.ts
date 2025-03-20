@@ -79,7 +79,7 @@ export class BinanceService {
                     throw new Error(error);
                 }
 
-                if (typeof data.serverTime !== 'number') {
+                if (!data || typeof data.serverTime !== 'number') {
                     console.error('Invalid server time format:', data);
                     throw new Error('تنسيق وقت السيرفر غير صالح');
                 }
@@ -96,9 +96,18 @@ export class BinanceService {
         try {
             const serverTime = await this.checkServerTime();
             const diff = Math.abs(serverTime - timestamp);
-            return diff <= this.recvWindow;
-        } catch {
-            return true;
+            const isValid = diff <= this.recvWindow;
+            console.log('Timestamp validation:', {
+                serverTime,
+                localTime: timestamp,
+                difference: diff,
+                recvWindow: this.recvWindow,
+                isValid
+            });
+            return isValid;
+        } catch (error) {
+            console.error('Error validating timestamp:', error);
+            return true; // نسمح بالمتابعة في حالة الخطأ
         }
     }
 
