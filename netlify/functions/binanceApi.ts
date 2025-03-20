@@ -4,7 +4,6 @@ import crypto from 'crypto';
 import https from 'https';
 
 const BINANCE_API_URL = 'https://api.binance.com';
-const PROXY_URL = 'https://proxy.cors.sh/';
 
 const agent = new https.Agent({
   keepAlive: true,
@@ -57,7 +56,6 @@ export const handler: Handler = async (event) => {
     }
 
     let requestUrl = `${BINANCE_API_URL}${endpoint}`;
-    let queryString = '';
 
     // معالجة خاصة لطلب وقت الخادم
     if (endpoint === '/api/v3/time') {
@@ -72,33 +70,24 @@ export const handler: Handler = async (event) => {
 
       const signature = createSignature(queryParams.toString(), secretKey);
       queryParams.append('signature', signature);
-      queryString = `?${queryParams.toString()}`;
-      requestUrl += queryString;
+      requestUrl += `?${queryParams.toString()}`;
     }
 
-    // استخدام proxy فقط على الدومين وليس على localhost
-    const isLocalhost = event.headers.host?.includes('localhost');
-    const finalUrl = isLocalhost ? requestUrl : `${PROXY_URL}${encodeURIComponent(requestUrl)}`;
-
-    console.log('Making request to:', finalUrl);
+    console.log('Making request to:', requestUrl);
 
     const requestHeaders: Record<string, string> = {
       'User-Agent': 'Mozilla/5.0',
       'Accept': 'application/json',
-      'x-cors-api-key': 'temp_f0f7c88a358d2a3e2b7e1f82a3f4c33a', // مفتاح مجاني للـ proxy
+      'Content-Type': 'application/json'
     };
 
     if (endpoint !== '/api/v3/time') {
       requestHeaders['X-MBX-APIKEY'] = apiKey;
     }
 
-    if (!isLocalhost) {
-      requestHeaders['origin'] = 'https://evoucher.netlify.app';
-    }
-
     console.log('Request headers:', requestHeaders);
 
-    const response = await fetch(finalUrl, {
+    const response = await fetch(requestUrl, {
       method: 'GET',
       headers: requestHeaders,
       agent,
@@ -111,9 +100,39 @@ export const handler: Handler = async (event) => {
     const responseText = await response.text();
     console.log('Raw response:', responseText);
 
-    let data;
     try {
-      data = JSON.parse(responseText);
+      const data = JSON.parse(responseText);
+
+      // التحقق من وجود خطأ في الرد
+      if (data.code && data.msg) {
+        console.log('Binance error response:', data);
+        return {
+          statusCode: response.status,
+          headers,
+          body: JSON.stringify({
+            error: data.msg,
+            code: data.code
+          })
+        };
+      }
+
+      // التحقق من صحة البيانات
+      if (endpoint === '/api/v3/time') {
+        if (typeof data.serverTime !== 'number') {
+          throw new Error('Invalid server time response format');
+        }
+      } else if (endpoint.includes('orderMatch/listUserOrderHistory')) {
+        if (!data.data || !Array.isArray(data.data)) {
+          throw new Error('Invalid orders response format');
+        }
+      }
+
+      return {
+        statusCode: response.status,
+        headers,
+        body: JSON.stringify(data)
+      };
+
     } catch (parseError) {
       console.error('Failed to parse response:', parseError);
       return {
@@ -125,51 +144,6 @@ export const handler: Handler = async (event) => {
         })
       };
     }
-
-    if (data.code && data.msg) {
-      console.log('Binance error response:', data);
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          error: data.msg,
-          code: data.code
-        })
-      };
-    }
-
-    // التحقق من نوع الاستجابة بناءً على نقطة النهاية
-    if (endpoint === '/api/v3/time') {
-      if (typeof data.serverTime !== 'number') {
-        console.error('Invalid server time response:', data);
-        return {
-          statusCode: 502,
-          headers,
-          body: JSON.stringify({
-            error: 'Invalid server time response format',
-            data
-          })
-        };
-      }
-    } else if (endpoint.includes('orderMatch/listUserOrderHistory')) {
-      if (!data.data || !Array.isArray(data.data)) {
-        console.error('Invalid orders response:', data);
-        return {
-          statusCode: 502,
-          headers,
-          body: JSON.stringify({
-            error: 'Invalid orders response format',
-            data
-          })
-        };
-      }
-    }
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify(data)
-    };
 
   } catch (error) {
     console.error('Error in binanceApi function:', error);
@@ -183,9 +157,6 @@ export const handler: Handler = async (event) => {
     } else if (errorMessage.includes('timeout')) {
       errorMessage = 'Request timed out';
       statusCode = 504;
-    } else if (errorMessage.includes('restricted location')) {
-      errorMessage = 'This service is not available in your region. Please try again later.';
-      statusCode = 451;
     }
 
     return {
