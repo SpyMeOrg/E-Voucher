@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import https from 'https';
 
 // استخدام proxy لتجاوز القيود الجغرافية
-const PROXY_URL = 'https://api.allorigins.win/raw?url=';
+const PROXY_URL = 'https://corsproxy.io/?';
 const BINANCE_API_URL = 'https://api.binance.com';
 
 // إنشاء وكيل HTTPS مع خيارات مخصصة
@@ -84,9 +84,18 @@ export const handler: Handler = async (event) => {
       requestUrl += queryString;
     }
 
-    console.log('Making request to:', requestUrl);
+    // استخدام proxy فقط على الدومين وليس على localhost
+    const isLocalhost = event.headers.host?.includes('localhost');
+    const finalUrl = isLocalhost ? requestUrl : `${PROXY_URL}${encodeURIComponent(requestUrl)}`;
 
-    const response = await fetch(requestUrl, {
+    console.log('Making request to:', finalUrl);
+    console.log('Request headers:', {
+      'X-MBX-APIKEY': apiKey,
+      'User-Agent': 'Mozilla/5.0',
+      'Accept': 'application/json'
+    });
+
+    const response = await fetch(finalUrl, {
       method: 'GET',
       headers: {
         ...(endpoint !== '/api/v3/time' ? { 'X-MBX-APIKEY': apiKey } : {}),
