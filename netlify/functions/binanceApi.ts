@@ -1,8 +1,15 @@
 import type { Handler } from '@netlify/functions';
 import fetch from 'node-fetch';
 import crypto from 'crypto';
+import https from 'https';
 
 const BINANCE_API_URL = 'https://api.binance.com';
+
+// إنشاء وكيل HTTPS مع خيارات مخصصة
+const agent = new https.Agent({
+  keepAlive: true,
+  rejectUnauthorized: false // تجاهل شهادات SSL غير الصالحة
+});
 
 interface BinanceRequestParams {
   apiKey: string;
@@ -22,8 +29,9 @@ export const handler: Handler = async (event) => {
   // إضافة CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Content-Type': 'application/json'
   };
 
   // معالجة طلبات OPTIONS
@@ -45,87 +53,95 @@ export const handler: Handler = async (event) => {
 
   try {
     if (!event.body) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Request body is required' })
-      };
+      throw new Error('Request body is required');
     }
 
-    console.log('Received request body:', event.body);
-    
     const { apiKey, secretKey, endpoint, params = {} } = JSON.parse(event.body) as BinanceRequestParams;
 
     if (!apiKey || !secretKey) {
-      console.error('Missing API Key or Secret Key');
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'API Key and Secret Key are required' })
-      };
+      throw new Error('API Key and Secret Key are required');
     }
 
     const timestamp = Date.now();
     const queryParams = new URLSearchParams({
-      ...params
+      ...params,
+      timestamp: timestamp.toString(),
+      recvWindow: '60000'
     });
 
-    // إضافة timestamp و recvWindow فقط إذا لم تكن نقطة النهاية هي /api/v3/time
+    // إضافة signature فقط إذا لم تكن نقطة النهاية هي /api/v3/time
     if (!endpoint.includes('/api/v3/time')) {
-      queryParams.append('timestamp', timestamp.toString());
-      queryParams.append('recvWindow', '60000');
       const signature = createSignature(queryParams.toString(), secretKey);
       queryParams.append('signature', signature);
     }
 
     const requestUrl = `${BINANCE_API_URL}${endpoint}?${queryParams.toString()}`;
-    console.log('Requesting URL:', requestUrl);
-
+    
     const response = await fetch(requestUrl, {
       method: 'GET',
       headers: {
         'X-MBX-APIKEY': apiKey,
-        'Content-Type': 'application/json'
-      }
+        'User-Agent': 'Mozilla/5.0', // إضافة User-Agent header
+        'Accept': 'application/json'
+      },
+      agent, // استخدام الوكيل المخصص
+      timeout: 30000 // زيادة مهلة الانتظار إلى 30 ثانية
     });
 
     const responseText = await response.text();
-    console.log('Raw response:', responseText);
-
-    let data;
+    
     try {
-      data = JSON.parse(responseText);
+      const data = JSON.parse(responseText);
+      
+      // التحقق من رسائل الخطأ المحددة من Binance
+      if (data.code && data.msg) {
+        if (data.code === -1022) {
+          throw new Error('Signature for this request is not valid');
+        } else if (data.code === -2015) {
+          throw new Error('API-key format invalid');
+        } else if (data.code === -2014) {
+          throw new Error('API-key invalid');
+        } else if (data.code === -1021) {
+          throw new Error('Timestamp for this request was 1000ms ahead of the server\'s time');
+        }
+        
+        throw new Error(data.msg);
+      }
+
+      return {
+        statusCode: response.status,
+        headers,
+        body: JSON.stringify(data)
+      };
     } catch (parseError) {
       console.error('Error parsing response:', parseError);
-      return {
-        statusCode: 502,
-        headers,
-        body: JSON.stringify({ 
-          error: 'Invalid response from Binance',
-          details: responseText
-        })
-      };
+      throw new Error('Invalid response format from Binance');
     }
-
-    console.log('Parsed Binance API Response:', data);
-
-    return {
-      statusCode: response.status,
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    };
 
   } catch (error) {
     console.error('Error in binanceApi function:', error);
+    
+    // تحسين رسائل الخطأ
+    let errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    let statusCode = 500;
+
+    if (errorMessage.includes('ECONNREFUSED')) {
+      errorMessage = 'Could not connect to Binance API';
+      statusCode = 503;
+    } else if (errorMessage.includes('timeout')) {
+      errorMessage = 'Request timed out';
+      statusCode = 504;
+    } else if (errorMessage.includes('restricted location')) {
+      errorMessage = 'This service is not available in your region. Please use a VPN.';
+      statusCode = 451;
+    }
+
     return {
-      statusCode: 500,
+      statusCode,
       headers,
       body: JSON.stringify({ 
-        error: 'Internal Server Error',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: errorMessage,
+        details: error instanceof Error ? error.stack : undefined
       })
     };
   }
