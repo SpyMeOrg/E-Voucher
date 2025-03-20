@@ -3,14 +3,12 @@ import fetch from 'node-fetch';
 import crypto from 'crypto';
 import https from 'https';
 
-// استخدام proxy لتجاوز القيود الجغرافية
-const PROXY_URL = 'https://corsproxy.io/?';
 const BINANCE_API_URL = 'https://api.binance.com';
+const PROXY_URL = 'https://proxy.cors.sh/';
 
-// إنشاء وكيل HTTPS مع خيارات مخصصة
 const agent = new https.Agent({
   keepAlive: true,
-  rejectUnauthorized: false // تجاهل شهادات SSL غير الصالحة
+  rejectUnauthorized: false
 });
 
 interface BinanceRequestParams {
@@ -28,7 +26,6 @@ const createSignature = (queryString: string, secretKey: string): string => {
 };
 
 export const handler: Handler = async (event) => {
-  // إضافة CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -36,13 +33,8 @@ export const handler: Handler = async (event) => {
     'Content-Type': 'application/json'
   };
 
-  // معالجة طلبات OPTIONS
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+    return { statusCode: 200, headers, body: '' };
   }
 
   if (event.httpMethod !== 'POST') {
@@ -89,19 +81,26 @@ export const handler: Handler = async (event) => {
     const finalUrl = isLocalhost ? requestUrl : `${PROXY_URL}${encodeURIComponent(requestUrl)}`;
 
     console.log('Making request to:', finalUrl);
-    console.log('Request headers:', {
-      'X-MBX-APIKEY': apiKey,
+
+    const requestHeaders: Record<string, string> = {
       'User-Agent': 'Mozilla/5.0',
-      'Accept': 'application/json'
-    });
+      'Accept': 'application/json',
+      'x-cors-api-key': 'temp_f0f7c88a358d2a3e2b7e1f82a3f4c33a', // مفتاح مجاني للـ proxy
+    };
+
+    if (endpoint !== '/api/v3/time') {
+      requestHeaders['X-MBX-APIKEY'] = apiKey;
+    }
+
+    if (!isLocalhost) {
+      requestHeaders['origin'] = 'https://evoucher.netlify.app';
+    }
+
+    console.log('Request headers:', requestHeaders);
 
     const response = await fetch(finalUrl, {
       method: 'GET',
-      headers: {
-        ...(endpoint !== '/api/v3/time' ? { 'X-MBX-APIKEY': apiKey } : {}),
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': 'application/json'
-      },
+      headers: requestHeaders,
       agent,
       timeout: 30000
     });
