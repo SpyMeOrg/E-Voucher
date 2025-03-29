@@ -12,7 +12,7 @@
   autoLaunch = false
   framework = "#custom"
   command = "npm run dev"
-  targetPort = 3002
+  targetPort = 3003
   port = 8888
   publish = "dist"
   functions = "netlify/functions"

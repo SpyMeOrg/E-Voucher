@@ -27,7 +27,7 @@ export class BinanceService {
         this.secretKey = secretKey;
         // تحديث العنوان بناءً على بيئة التشغيل
         this.baseUrl = window.location.hostname === 'localhost' 
-            ? 'http://localhost:8888/.netlify/functions/binanceApi'
+            ? 'http://localhost:3001/.netlify/functions/binanceApi'
             : `${window.location.origin}/.netlify/functions/binanceApi`;
     }
 
