@@ -14,6 +14,11 @@ export const OrderTracking: React.FC = () => {
     setStatus(result);
   };
 
+  const handleDisconnect = async () => {
+    await serverService.disconnect();
+    setStatus({ status: 'disconnected' });
+  };
+
   const handleInstall = async () => {
     const result = await serverService.installDependencies();
     setStatus(result);
@@ -67,10 +72,18 @@ export const OrderTracking: React.FC = () => {
           <div className="flex space-x-4">
             <button
               onClick={handleConnect}
-              disabled={status.status === 'connecting'}
+              disabled={status.status === 'connecting' || status.status === 'connected'}
               className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
             >
               {status.status === 'connecting' ? 'جاري الاتصال...' : 'اتصال بالسيرفر'}
+            </button>
+
+            <button
+              onClick={handleDisconnect}
+              disabled={status.status !== 'connected'}
+              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 disabled:bg-gray-400"
+            >
+              قطع الاتصال
             </button>
 
             <button
