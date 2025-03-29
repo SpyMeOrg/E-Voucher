@@ -43,9 +43,9 @@ class ServerService {
       }
 
       return this.status;
-    } catch (error) {
+    } catch (error: any) {
       this.status.status = 'error';
-      this.status.message = error.message;
+      this.status.message = error?.message || 'حدث خطأ غير معروف';
       return this.status;
     }
   }
@@ -70,9 +70,9 @@ class ServerService {
       this.status.message = 'تم تثبيت المكتبات بنجاح';
       
       return this.status;
-    } catch (error) {
+    } catch (error: any) {
       this.status.status = 'error';
-      this.status.message = error.message;
+      this.status.message = error?.message || 'حدث خطأ غير معروف';
       return this.status;
     }
   }
