@@ -3,6 +3,7 @@ import { read, utils } from 'xlsx';
 import { exportToExcel } from './utils/excelExport';
 import { BinanceTab } from './features/binance/components/BinanceTab';
 import { AveragePriceTab } from './features/average-price/components/AveragePriceTab';
+import { OrderTrackingTab } from './features/order-tracking/components/OrderTrackingTab';
 
 interface CalculationResult {
   totalEGP: number;
@@ -35,7 +36,7 @@ export default function App() {
   const [result, setResult] = useState<CalculationResult | null>(null);
   // إضافة حالة لتخزين البيانات المستوردة
   const [importedData, setImportedData] = useState<ImportedRow[]>([]);
-  const [activeTab, setActiveTab] = useState<'calculator' | 'binance' | 'average-price'>('calculator');
+  const [activeTab, setActiveTab] = useState<'calculator' | 'binance' | 'average-price' | 'order-tracking'>('calculator');
 
   const calculateResults = () => {
     // التحقق من وجود مبالغ مدخلة فقط
@@ -300,6 +301,12 @@ export default function App() {
               >
                 حساب متوسط السعر
               </button>
+              <button
+                onClick={() => setActiveTab('order-tracking')}
+                className={`border-b-2 ${activeTab === 'order-tracking' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
+              >
+                تتبع الطلبات
+              </button>
             </nav>
           </div>
         </div>
@@ -503,8 +510,10 @@ export default function App() {
           </div>
         ) : activeTab === 'binance' ? (
           <BinanceTab />
-        ) : (
+        ) : activeTab === 'average-price' ? (
           <AveragePriceTab />
+        ) : (
+          <OrderTrackingTab />
         )}
       </div>
 
