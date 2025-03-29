@@ -1,0 +1,18 @@
+[Unit]
+Description=Voo Order Tracker Service
+After=network.target
+
+[Service]
+Type=simple
+User=voo-app
+WorkingDirectory=/home/voo-app/voo-order-tracker
+ExecStart=/usr/bin/npm run server
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=voo-tracker
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target 
