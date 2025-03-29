@@ -27,15 +27,18 @@
     "file-saver": "^2.0.5",
     "node-fetch": "^2.6.9",
     "node-forge": "^1.3.1",
+    "node-imap": "^0.9.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "stream-browserify": "^3.0.0",
     "tesseract.js": "^6.0.0",
     "typescript": "^5.0.2",
     "vite": "^4.3.9",
+    "whatsapp-web.js": "^1.23.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/node-imap": "^0.8.35",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
