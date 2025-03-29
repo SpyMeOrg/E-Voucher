@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { serverService } from '../services/serverService';
+import { ServerStatus } from '../types/server';
 
 export const OrderTrackingTab: React.FC = () => {
   const [ip, setIp] = useState('');
   const [pemKey, setPemKey] = useState('');
-  const [status, setStatus] = useState({ status: 'disconnected' });
+  const [status, setStatus] = useState<ServerStatus>({ status: 'disconnected' });
 
   const handleConnect = async () => {
     const result = await serverService.connect(ip, pemKey);
@@ -93,7 +94,7 @@ export const OrderTrackingTab: React.FC = () => {
             </span>
             <div 
               className={`w-3 h-3 rounded-full ${
-                status.status === 'connected' ? 'bg-green-500' :
+                status.status === 'connected' || status.status === 'installed' ? 'bg-green-500' :
                 status.status === 'error' ? 'bg-red-500' :
                 status.status === 'connecting' || status.status === 'installing' ? 'bg-yellow-500' :
                 'bg-gray-500'
@@ -109,7 +110,7 @@ export const OrderTrackingTab: React.FC = () => {
         </div>
 
         {/* أزرار التحكم */}
-        {status.status === 'connected' && (
+        {(status.status === 'connected' || status.status === 'installed') && (
           <div className="flex justify-end gap-4">
             <button
               onClick={handleInstall}
