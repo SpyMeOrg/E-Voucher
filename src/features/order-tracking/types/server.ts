@@ -13,4 +13,4 @@ export interface WhatsAppConfig {
 export interface ServerStatus {
   status: 'connected' | 'disconnected' | 'error' | 'connecting' | 'installing' | 'installed';
   message?: string;
-} 
+}

@@ -3,7 +3,9 @@ import { read, utils } from 'xlsx';
 import { exportToExcel } from './utils/excelExport';
 import { BinanceTab } from './features/binance/components/BinanceTab';
 import { AveragePriceTab } from './features/average-price/components/AveragePriceTab';
-import { OrderTrackingTab } from './features/order-tracking/components/OrderTrackingTab';
+import { OrderTrackingTab } from './features/order-tracking/components';
+
+type TabType = 'calculator' | 'binance' | 'average-price' | 'order-tracking';
 
 interface CalculationResult {
   totalEGP: number;
@@ -36,7 +38,7 @@ export default function App() {
   const [result, setResult] = useState<CalculationResult | null>(null);
   // إضافة حالة لتخزين البيانات المستوردة
   const [importedData, setImportedData] = useState<ImportedRow[]>([]);
-  const [activeTab, setActiveTab] = useState<'calculator' | 'binance' | 'average-price' | 'order-tracking'>('calculator');
+  const [activeTab, setActiveTab] = useState<TabType>('calculator');
 
   const calculateResults = () => {
     // التحقق من وجود مبالغ مدخلة فقط

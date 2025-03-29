@@ -110,17 +110,23 @@ export const OrderTrackingTab: React.FC = () => {
         </div>
 
         {/* أزرار التحكم */}
-        {(status.status === 'connected' || status.status === 'installed') && (
-          <div className="flex justify-end gap-4">
-            <button
-              onClick={handleInstall}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
-              disabled={status.status === 'installing'}
-            >
-              {status.status === 'installing' ? 'جاري التثبيت...' : 'تثبيت المكتبات'}
-            </button>
-          </div>
-        )}
+        <div className="flex justify-end gap-4">
+          {(() => {
+            const isConnectedOrInstalled = status.status === 'connected' || status.status === 'installed';
+            const isInstalling = status.status === 'installing';
+            const isInstalled = status.status === 'installed';
+
+            return isConnectedOrInstalled && (
+              <button
+                onClick={handleInstall}
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                disabled={isInstalling || isInstalled}
+              >
+                {isInstalling ? 'جاري التثبيت...' : isInstalled ? 'تم التثبيت' : 'تثبيت المكتبات'}
+              </button>
+            );
+          })()}
+        </div>
       </div>
     </div>
   );

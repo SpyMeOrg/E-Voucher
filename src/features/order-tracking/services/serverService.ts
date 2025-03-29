@@ -1,96 +1,49 @@
-import { ServerConfig, ServerStatus } from '../types/server';
-import { NodeSSH } from 'node-ssh';
+import { ServerStatus } from '../types/server';
+
+const API_URL = 'http://localhost:3001';
 
 class ServerService {
-  private config: ServerConfig = {
-    ip: '',
-    pemKey: '',
-    isConnected: false,
-    isInstalled: false
-  };
-
-  private status: ServerStatus = {
-    status: 'disconnected'
-  };
-
-  private ssh: NodeSSH = new NodeSSH();
-
   async connect(ip: string, pemKey: string): Promise<ServerStatus> {
     try {
-      this.status.status = 'connecting';
-      
-      // الاتصال بالسيرفر
-      await this.ssh.connect({
-        host: ip,
-        username: 'ubuntu',
-        privateKey: pemKey,
-        port: 22,
-        tryKeyboard: true,
-        readyTimeout: 20000
+      const response = await fetch(`${API_URL}/connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ip, pemKey }),
       });
-
-      // التحقق من الاتصال
-      const result = await this.ssh.execCommand('echo "Connection successful"');
-      
-      if (result.code === 0) {
-        this.config.ip = ip;
-        this.config.pemKey = pemKey;
-        this.config.isConnected = true;
-        this.status.status = 'connected';
-        this.status.message = 'تم الاتصال بالسيرفر بنجاح';
-      } else {
-        throw new Error('فشل الاتصال بالسيرفر');
-      }
-
-      return this.status;
+      return await response.json();
     } catch (error: any) {
-      this.status.status = 'error';
-      this.status.message = error?.message || 'حدث خطأ غير معروف';
-      return this.status;
+      return { status: 'error', message: error.message };
     }
   }
 
   async installDependencies(): Promise<ServerStatus> {
     try {
-      this.status.status = 'installing';
-      
-      // تحديث النظام
-      await this.ssh.execCommand('sudo apt-get update');
-      
-      // تثبيت Node.js
-      await this.ssh.execCommand('curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -');
-      await this.ssh.execCommand('sudo apt-get install -y nodejs');
-      
-      // تثبيت المكتبات المطلوبة
-      await this.ssh.execCommand('npm install -g pm2');
-      await this.ssh.execCommand('npm install node-imap xlsx whatsapp-web.js');
-      
-      this.config.isInstalled = true;
-      this.status.status = 'installed';
-      this.status.message = 'تم تثبيت المكتبات بنجاح';
-      
-      return this.status;
+      const response = await fetch(`${API_URL}/install`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return await response.json();
     } catch (error: any) {
-      this.status.status = 'error';
-      this.status.message = error?.message || 'حدث خطأ غير معروف';
-      return this.status;
+      return { status: 'error', message: error.message };
     }
   }
 
-  async disconnect(): Promise<void> {
-    if (this.ssh.isConnected()) {
-      this.ssh.dispose();
-      this.config.isConnected = false;
-      this.status.status = 'disconnected';
+  async disconnect(): Promise<ServerStatus> {
+    try {
+      const response = await fetch(`${API_URL}/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return await response.json();
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
     }
-  }
-
-  getStatus(): ServerStatus {
-    return this.status;
-  }
-
-  getConfig(): ServerConfig {
-    return this.config;
   }
 }
 
