@@ -107,6 +107,60 @@ export const BatchAnalyzerTab: React.FC = () => {
     const updatedFiles = selectedFiles.filter(file => newSelectedFileIds.has(file.name));
     setSelectedFiles(updatedFiles);
     setTotalSelectedFiles(updatedFiles.length);
+
+    // إعادة حساب النتائج للملفات المحددة فقط
+    const selectedProcessedFiles = processedFiles.filter(file => newSelectedFileIds.has(file.name));
+    updateSummary(selectedProcessedFiles);
+  };
+
+  // تحديث ملخص النتائج
+  const updateSummary = (files: ProcessedFile[]) => {
+    if (files.length > 0) {
+      const totalAmount = files.reduce((sum, file) => sum + file.totalAmount, 0);
+      const totalUsdt = files.reduce((sum, file) => sum + file.totalUsdt, 0);
+      const totalEntries = files.reduce((sum, file) => sum + file.entryCount, 0);
+      const averagePrice = totalUsdt > 0 ? totalAmount / totalUsdt : 0;
+      
+      setSummary({
+        totalAmount,
+        totalUsdt,
+        averagePrice,
+        fileCount: files.length,
+        entryCount: totalEntries,
+        files: files.map(f => f.name)
+      });
+    } else {
+      setSummary(null);
+    }
+  };
+
+  // تحديث الملفات المحددة في الشهر
+  const toggleMonthSelection = (month: string, isChecked: boolean) => {
+    const monthFiles = processedFiles.filter(file => {
+      const fileDate = extractDateFromFileName(file.name);
+      if (!fileDate) return false;
+      const fileMonth = `${(fileDate.getMonth() + 1).toString().padStart(2, '0')}/${fileDate.getFullYear()}`;
+      return fileMonth === month;
+    });
+
+    const newSelectedFileIds = new Set(selectedFileIds);
+    monthFiles.forEach(file => {
+      if (isChecked) {
+        newSelectedFileIds.add(file.name);
+      } else {
+        newSelectedFileIds.delete(file.name);
+      }
+    });
+    setSelectedFileIds(newSelectedFileIds);
+
+    // تحديث قائمة الملفات المحددة وإعادة حساب النتائج
+    const updatedFiles = selectedFiles.filter(file => newSelectedFileIds.has(file.name));
+    setSelectedFiles(updatedFiles);
+    setTotalSelectedFiles(updatedFiles.length);
+
+    // إعادة حساب النتائج للملفات المحددة فقط
+    const selectedProcessedFiles = processedFiles.filter(file => newSelectedFileIds.has(file.name));
+    updateSummary(selectedProcessedFiles);
   };
 
   // معالجة الملفات
@@ -656,13 +710,21 @@ export const BatchAnalyzerTab: React.FC = () => {
               <button
                 onClick={() => {
                   const allFileIds = new Set(selectedFiles.map(file => file.name));
-                  if (selectedFileIds.size === allFileIds.size) {
-                    // إلغاء تحديد الكل
-                    setSelectedFileIds(new Set());
-                  } else {
+                  const newSelectedFileIds = new Set<string>();
+                  
+                  if (selectedFileIds.size !== allFileIds.size) {
                     // تحديد الكل
-                    setSelectedFileIds(allFileIds);
+                    processedFiles.forEach(file => newSelectedFileIds.add(file.name));
                   }
+                  
+                  setSelectedFileIds(newSelectedFileIds);
+                  const updatedFiles = selectedFiles.filter(file => newSelectedFileIds.has(file.name));
+                  setSelectedFiles(updatedFiles);
+                  setTotalSelectedFiles(updatedFiles.length);
+                  
+                  // إعادة حساب النتائج للملفات المحددة فقط
+                  const selectedProcessedFiles = processedFiles.filter(file => newSelectedFileIds.has(file.name));
+                  updateSummary(selectedProcessedFiles);
                 }}
                 className="text-xs px-3 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition"
               >
@@ -694,15 +756,7 @@ export const BatchAnalyzerTab: React.FC = () => {
                         type="checkbox"
                         checked={monthFiles.every(file => selectedFileIds.has(file.name))}
                         onChange={(e) => {
-                          const newSelectedFileIds = new Set(selectedFileIds);
-                          monthFiles.forEach(file => {
-                            if (e.target.checked) {
-                              newSelectedFileIds.add(file.name);
-                            } else {
-                              newSelectedFileIds.delete(file.name);
-                            }
-                          });
-                          setSelectedFileIds(newSelectedFileIds);
+                          toggleMonthSelection(month, e.target.checked);
                         }}
                         onClick={(e) => e.stopPropagation()}
                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
