@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { FileProcessorService } from '../services/fileProcessorService';
 import { BatchFileSummary, ProcessedFile } from '../types/types';
 import * as XLSX from 'xlsx';
@@ -372,7 +372,7 @@ export const BatchAnalyzerTab: React.FC = () => {
         <h4 className="text-sm font-semibold mb-3 text-right">تطور متوسط السعر الشهري</h4>
         <div className="relative h-40 mt-2">
           <div className="flex items-end justify-between h-32 relative">
-            {months.map((month, index) => {
+            {months.map((month) => {
               const data = monthlyAnalysisData[month];
               const height = (data.averagePrice / maxPrice) * 100;
               
