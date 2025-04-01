@@ -488,7 +488,11 @@ export const BatchAnalyzerTab: React.FC = () => {
 
   // رسم تمثيل للبيانات البيانية
   const renderMonthlyChart = () => {
-    if (!monthlyAnalysisData) return null;
+    if (!monthlyAnalysisData || Object.keys(monthlyAnalysisData).length === 0) return (
+      <div className="text-center py-8">
+        <p className="text-gray-500">لا توجد بيانات كافية لعرض الرسم البياني</p>
+      </div>
+    );
 
     const chartData = Object.entries(monthlyAnalysisData).map(([month, data]) => ({
       month,
