@@ -512,30 +512,30 @@ export const BatchAnalyzerTab: React.FC = () => {
             <div className="space-y-1 text-xs">
               <p className="text-right">
                 <span className="text-gray-500">متوسط السعر:</span>
-                <span className="font-semibold mr-1">{payload[0].value}</span>
+                <span className="font-semibold mr-1">{payload[0]?.value || 'N/A'}</span>
               </p>
               <p className="text-right">
                 <span className="text-gray-500">أقل سعر:</span>
-                <span className="font-semibold mr-1">{payload[1].value}</span>
+                <span className="font-semibold mr-1">{payload[1]?.value || 'N/A'}</span>
               </p>
               <p className="text-right">
                 <span className="text-gray-500">أعلى سعر:</span>
-                <span className="font-semibold mr-1">{payload[2].value}</span>
+                <span className="font-semibold mr-1">{payload[2]?.value || 'N/A'}</span>
               </p>
               <p className="text-right">
                 <span className="text-gray-500">حجم التداول:</span>
-                <span className="font-semibold mr-1">{payload[3].value} USDT</span>
+                <span className="font-semibold mr-1">{payload[3]?.value || 'N/A'} USDT</span>
               </p>
               <p className="text-right">
                 <span className="text-gray-500">التغير في السعر:</span>
-                <span className={`font-semibold mr-1 ${payload[4].value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {payload[4].value > 0 ? '+' : ''}{payload[4].value}%
+                <span className={`font-semibold mr-1 ${payload[4]?.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {payload[4]?.value > 0 ? '+' : ''}{payload[4]?.value || 'N/A'}%
                 </span>
               </p>
               <p className="text-right">
                 <span className="text-gray-500">التغير في الحجم:</span>
-                <span className={`font-semibold mr-1 ${payload[5].value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {payload[5].value > 0 ? '+' : ''}{payload[5].value}%
+                <span className={`font-semibold mr-1 ${payload[5]?.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {payload[5]?.value > 0 ? '+' : ''}{payload[5]?.value || 'N/A'}%
                 </span>
               </p>
             </div>
