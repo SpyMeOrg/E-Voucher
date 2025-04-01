@@ -12,7 +12,6 @@ export const BatchAnalyzerTab: React.FC = () => {
   const [totalSelectedFiles, setTotalSelectedFiles] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const multipleFoldersInputRef = useRef<HTMLInputElement>(null);
 
   // استيراد ملفات متعددة
   const handleFilesImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -28,9 +27,12 @@ export const BatchAnalyzerTab: React.FC = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    
+    // عرض رسالة للمستخدم
+    setProcessingStatus(`تم إضافة ${newFiles.length} ملف. الإجمالي: ${totalSelectedFiles + newFiles.length} ملف`);
   };
 
-  // استيراد مجلد كامل
+  // استيراد مجلد
   const handleFolderImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -54,32 +56,9 @@ export const BatchAnalyzerTab: React.FC = () => {
     if (folderInputRef.current) {
       folderInputRef.current.value = '';
     }
-  };
-
-  // استيراد عدة مجلدات
-  const handleMultipleFoldersImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
     
-    // الحصول على قائمة ملفات الإكسل من المجلدات
-    const excelFiles = Array.from(files).filter(file => 
-      file.name.toLowerCase().endsWith('.xlsx') || 
-      file.name.toLowerCase().endsWith('.xls')
-    );
-    
-    if (excelFiles.length === 0) {
-      setProcessingStatus('لم يتم العثور على ملفات إكسل في المجلدات المحددة');
-      return;
-    }
-    
-    // تجميع الملفات المحددة
-    setSelectedFiles(prev => [...prev, ...excelFiles]);
-    setTotalSelectedFiles(prev => prev + excelFiles.length);
-    
-    // إعادة تعيين حقل الإدخال
-    if (multipleFoldersInputRef.current) {
-      multipleFoldersInputRef.current.value = '';
-    }
+    // عرض رسالة للمستخدم
+    setProcessingStatus(`تم إضافة ${excelFiles.length} ملف من المجلد. الإجمالي: ${totalSelectedFiles + excelFiles.length} ملف`);
   };
 
   // معالجة الملفات
@@ -270,11 +249,14 @@ export const BatchAnalyzerTab: React.FC = () => {
                   />
                 </label>
               </div>
+              <p className="text-xs text-gray-500 mt-1 text-right">
+                يمكنك اختيار عدة ملفات بالضغط على Ctrl أثناء الاختيار
+              </p>
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
-                اختيار مجلد كامل
+                اختيار مجلد
               </label>
               <div className="flex">
                 <label className="flex-1 cursor-pointer bg-white text-center py-2 px-4 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 transition">
@@ -293,31 +275,8 @@ export const BatchAnalyzerTab: React.FC = () => {
                   />
                 </label>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
-                اختيار مجلد آخر (تجميع)
-              </label>
-              <div className="flex">
-                <label className="flex-1 cursor-pointer bg-white text-center py-2 px-4 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 transition">
-                  <span className="text-indigo-600">إضافة مجلد آخر</span>
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls"
-                    multiple
-                    /* @ts-ignore */
-                    directory=""
-                    webkitdirectory=""
-                    onChange={handleMultipleFoldersImport}
-                    className="hidden"
-                    ref={multipleFoldersInputRef}
-                    disabled={isProcessing}
-                  />
-                </label>
-              </div>
               <p className="text-xs text-gray-500 mt-1 text-right">
-                يمكنك إضافة أكثر من مجلد واحدًا تلو الآخر، ثم معالجتهم جميعًا معًا
+                يمكنك اختيار مجلد واحد في كل مرة، ويمكنك تكرار العملية لإضافة عدة مجلدات
               </p>
             </div>
 
