@@ -9,8 +9,9 @@ export const BatchAnalyzerTab: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [processedFiles, setProcessedFiles] = useState<ProcessedFile[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [totalSelectedFiles, setTotalSelectedFiles] = useState<number>(0);
-  const [expandedFiles, setExpandedFiles] = useState<number[]>([]);
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [showAllDetails, setShowAllDetails] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -34,16 +35,25 @@ export const BatchAnalyzerTab: React.FC = () => {
       return;
     }
     
-    setSelectedFiles(prev => [...prev, ...excelFiles]);
-    setTotalSelectedFiles(prev => prev + excelFiles.length);
+    // إضافة الملفات الجديدة إلى القائمة الحالية
+    const updatedFiles = [...selectedFiles, ...excelFiles];
+    setSelectedFiles(updatedFiles);
+    
+    // تحديث الملفات المحددة تلقائياً
+    const newFileIds = new Set(selectedFileIds);
+    excelFiles.forEach(file => {
+      newFileIds.add(file.name);
+    });
+    setSelectedFileIds(newFileIds);
+    
+    setTotalSelectedFiles(updatedFiles.length);
     
     // إعادة تعيين حقل الإدخال
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
     
-    // عرض رسالة للمستخدم
-    setProcessingStatus(`تم إضافة ${excelFiles.length} ملف. الإجمالي: ${totalSelectedFiles + excelFiles.length} ملف`);
+    setProcessingStatus(`تم إضافة ${excelFiles.length} ملف. الإجمالي: ${updatedFiles.length} ملف`);
   };
 
   // استيراد مجلد
@@ -62,16 +72,41 @@ export const BatchAnalyzerTab: React.FC = () => {
       return;
     }
     
-    setSelectedFiles(prev => [...prev, ...excelFiles]);
-    setTotalSelectedFiles(prev => prev + excelFiles.length);
+    // إضافة الملفات الجديدة إلى القائمة الحالية
+    const updatedFiles = [...selectedFiles, ...excelFiles];
+    setSelectedFiles(updatedFiles);
+    
+    // تحديث الملفات المحددة تلقائياً
+    const newFileIds = new Set(selectedFileIds);
+    excelFiles.forEach(file => {
+      newFileIds.add(file.name);
+    });
+    setSelectedFileIds(newFileIds);
+    
+    setTotalSelectedFiles(updatedFiles.length);
     
     // إعادة تعيين حقل الإدخال
     if (folderInputRef.current) {
       folderInputRef.current.value = '';
     }
     
-    // عرض رسالة للمستخدم
-    setProcessingStatus(`تم إضافة ${excelFiles.length} ملف من المجلد. الإجمالي: ${totalSelectedFiles + excelFiles.length} ملف`);
+    setProcessingStatus(`تم إضافة ${excelFiles.length} ملف من المجلد. الإجمالي: ${updatedFiles.length} ملف`);
+  };
+
+  // تحديد/إلغاء تحديد ملف
+  const toggleFileSelection = (fileName: string) => {
+    const newSelectedFileIds = new Set(selectedFileIds);
+    if (newSelectedFileIds.has(fileName)) {
+      newSelectedFileIds.delete(fileName);
+    } else {
+      newSelectedFileIds.add(fileName);
+    }
+    setSelectedFileIds(newSelectedFileIds);
+    
+    // تحديث قائمة الملفات المحددة
+    const updatedFiles = selectedFiles.filter(file => newSelectedFileIds.has(file.name));
+    setSelectedFiles(updatedFiles);
+    setTotalSelectedFiles(updatedFiles.length);
   };
 
   // معالجة الملفات
@@ -81,10 +116,9 @@ export const BatchAnalyzerTab: React.FC = () => {
       return;
     }
 
-    await processFiles(selectedFiles);
-    // تنظيف الملفات المحددة بعد المعالجة
-    setSelectedFiles([]);
-    setTotalSelectedFiles(0);
+    // معالجة الملفات المحددة فقط
+    const filesToProcess = selectedFiles.filter(file => selectedFileIds.has(file.name));
+    await processFiles(filesToProcess);
   };
 
   // معالجة الملفات المحددة
@@ -96,7 +130,7 @@ export const BatchAnalyzerTab: React.FC = () => {
       // تنظيف النتائج السابقة
       setSummary(null);
       setProcessedFiles([]);
-      setExpandedFiles([]);
+      setExpandedMonths(new Set());
       
       // معالجة كل ملف واحد تلو الآخر
       const processedResults: ProcessedFile[] = [];
@@ -166,9 +200,9 @@ export const BatchAnalyzerTab: React.FC = () => {
         ['معلومات التحليل', ''],
         ['عدد الملفات', summary.fileCount.toString()],
         ['عدد العمليات', summary.entryCount.toString()],
-        ['إجمالي المبلغ بالجنيه', summary.totalAmount.toFixed(2)],
-        ['إجمالي كمية USDT', summary.totalUsdt.toFixed(2)],
-        ['متوسط السعر', summary.averagePrice.toFixed(2)],
+        ['إجمالي المبلغ بالجنيه', summary.totalAmount.toFixed(4)],
+        ['إجمالي كمية USDT', summary.totalUsdt.toFixed(4)],
+        ['متوسط السعر', summary.averagePrice.toFixed(4)],
         ['', ''],
         ['تفاصيل الملفات', '']
       ];
@@ -185,15 +219,15 @@ export const BatchAnalyzerTab: React.FC = () => {
         ]);
         summaryData.push([
           'إجمالي المبلغ بالجنيه',
-          file.totalAmount.toFixed(2)
+          file.totalAmount.toFixed(4)
         ]);
         summaryData.push([
           'إجمالي كمية USDT',
-          file.totalUsdt.toFixed(2)
+          file.totalUsdt.toFixed(4)
         ]);
         summaryData.push([
           'متوسط السعر',
-          (file.totalUsdt > 0 ? file.totalAmount / file.totalUsdt : 0).toFixed(2)
+          (file.totalUsdt > 0 ? file.totalAmount / file.totalUsdt : 0).toFixed(4)
         ]);
         summaryData.push(['', '']);
       });
@@ -208,9 +242,9 @@ export const BatchAnalyzerTab: React.FC = () => {
         file.entries.forEach(entry => {
           detailsData.push([
             entry.fileName,
-            entry.amount.toFixed(2),
-            entry.usdtAmount.toFixed(2),
-            entry.price.toFixed(2)
+            entry.amount.toFixed(4),
+            entry.usdtAmount.toFixed(4),
+            entry.price.toFixed(4)
           ]);
         });
       });
@@ -224,9 +258,9 @@ export const BatchAnalyzerTab: React.FC = () => {
       Object.entries(monthlyData).forEach(([month, data]) => {
         monthlyAnalysisData.push([
           month,
-          data.totalAmount.toFixed(2),
-          data.totalUsdt.toFixed(2),
-          data.averagePrice.toFixed(2),
+          data.totalAmount.toFixed(4),
+          data.totalUsdt.toFixed(4),
+          data.averagePrice.toFixed(4),
           data.count.toString()
         ]);
       });
@@ -254,23 +288,26 @@ export const BatchAnalyzerTab: React.FC = () => {
     }
   };
 
-  // التبديل بين عرض تفاصيل ملف وإخفائها
-  const toggleFileDetails = (index: number) => {
-    if (expandedFiles.includes(index)) {
-      setExpandedFiles(expandedFiles.filter(i => i !== index));
-    } else {
-      setExpandedFiles([...expandedFiles, index]);
-    }
-  };
-
   // تبديل حالة عرض جميع التفاصيل
-  const toggleAllDetails = () => {
+  const toggleAllMonths = () => {
     if (showAllDetails) {
-      setExpandedFiles([]);
+      setExpandedMonths(new Set());
     } else {
-      setExpandedFiles(processedFiles.map((_, index) => index));
+      const allMonths = new Set(Object.keys(monthlyAnalysisData || {}));
+      setExpandedMonths(allMonths);
     }
     setShowAllDetails(!showAllDetails);
+  };
+
+  // تبديل عرض شهر معين
+  const toggleMonth = (month: string) => {
+    const newExpandedMonths = new Set(expandedMonths);
+    if (newExpandedMonths.has(month)) {
+      newExpandedMonths.delete(month);
+    } else {
+      newExpandedMonths.add(month);
+    }
+    setExpandedMonths(newExpandedMonths);
   };
 
   // استخراج تاريخ من اسم الملف
@@ -390,7 +427,7 @@ export const BatchAnalyzerTab: React.FC = () => {
                       }}
                     ></div>
                     <div className="absolute bottom-0 right-0 left-0 px-1 py-0.5 bg-blue-100 rounded-sm text-blue-700 text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none transform translate-y-full z-10">
-                      {data.averagePrice.toFixed(2)}
+                      {data.averagePrice.toFixed(4)}
                     </div>
                   </div>
                   <div className="text-xs text-gray-600 mt-1 transform -rotate-45 origin-top-left">
@@ -540,15 +577,15 @@ export const BatchAnalyzerTab: React.FC = () => {
                 </div>
                 <div className="bg-white p-3 rounded border border-gray-200">
                   <div className="text-sm text-gray-500 text-right">إجمالي المبلغ بالجنيه</div>
-                  <div className="text-lg font-bold text-right">{summary.totalAmount.toFixed(2)}</div>
+                  <div className="text-lg font-bold text-right">{summary.totalAmount.toFixed(4)}</div>
                 </div>
                 <div className="bg-white p-3 rounded border border-gray-200">
                   <div className="text-sm text-gray-500 text-right">إجمالي كمية USDT</div>
-                  <div className="text-lg font-bold text-right">{summary.totalUsdt.toFixed(2)}</div>
+                  <div className="text-lg font-bold text-right">{summary.totalUsdt.toFixed(4)}</div>
                 </div>
                 <div className="bg-white p-3 rounded border border-gray-200 col-span-2">
                   <div className="text-sm text-gray-500 text-right">متوسط السعر</div>
-                  <div className="text-xl font-bold text-right text-indigo-600">{summary.averagePrice.toFixed(2)}</div>
+                  <div className="text-xl font-bold text-right text-indigo-600">{summary.averagePrice.toFixed(4)}</div>
                 </div>
               </div>
               
@@ -593,9 +630,9 @@ export const BatchAnalyzerTab: React.FC = () => {
                 {Object.entries(monthlyAnalysisData).map(([month, data], index) => (
                   <tr key={month} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">{month}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.totalAmount.toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.totalUsdt.toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.averagePrice.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.totalAmount.toFixed(4)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.totalUsdt.toFixed(4)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.averagePrice.toFixed(4)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.count}</td>
                   </tr>
                 ))}
@@ -609,63 +646,130 @@ export const BatchAnalyzerTab: React.FC = () => {
       {processedFiles.length > 0 && (
         <div className="mt-8">
           <div className="flex justify-between items-center mb-4">
-            <button
-              onClick={toggleAllDetails}
-              className="text-xs px-3 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition"
-            >
-              {showAllDetails ? 'طي الكل' : 'عرض الكل'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleAllMonths}
+                className="text-xs px-3 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition"
+              >
+                {showAllDetails ? 'طي الكل' : 'عرض الكل'}
+              </button>
+              <button
+                onClick={() => {
+                  const allFileIds = new Set(selectedFiles.map(file => file.name));
+                  if (selectedFileIds.size === allFileIds.size) {
+                    // إلغاء تحديد الكل
+                    setSelectedFileIds(new Set());
+                  } else {
+                    // تحديد الكل
+                    setSelectedFileIds(allFileIds);
+                  }
+                }}
+                className="text-xs px-3 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition"
+              >
+                {selectedFileIds.size === selectedFiles.length ? 'إلغاء تحديد الكل' : 'تحديد الكل'}
+              </button>
+            </div>
             <h3 className="text-lg font-semibold text-right">تفاصيل الملفات</h3>
           </div>
           
+          {/* عرض الملفات حسب الشهور */}
           <div className="space-y-2">
-            {processedFiles.map((file, index) => (
-              <div key={index} className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
-                {/* رأس الملف (قابل للنقر) */}
-                <div
-                  className="flex justify-between items-center p-3 cursor-pointer hover:bg-gray-100 transition"
-                  onClick={() => toggleFileDetails(index)}
-                >
-                  <div className="flex items-center">
-                    <svg
-                      className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${expandedFiles.includes(index) ? 'transform rotate-90' : ''}`}
-                      fill="none"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path d="M9 5l7 7-7 7"></path>
-                    </svg>
-                    <span className="text-sm text-gray-500 ml-2">{file.entryCount} عملية</span>
+            {Object.entries(monthlyAnalysisData || {}).map(([month, data]) => {
+              const monthFiles = processedFiles.filter(file => {
+                const fileDate = extractDateFromFileName(file.name);
+                if (!fileDate) return false;
+                const fileMonth = `${(fileDate.getMonth() + 1).toString().padStart(2, '0')}/${fileDate.getFullYear()}`;
+                return fileMonth === month;
+              });
+
+              return (
+                <div key={month} className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                  {/* رأس الشهر */}
+                  <div
+                    className="flex justify-between items-center p-3 cursor-pointer hover:bg-gray-100 transition"
+                    onClick={() => toggleMonth(month)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={monthFiles.every(file => selectedFileIds.has(file.name))}
+                        onChange={(e) => {
+                          const newSelectedFileIds = new Set(selectedFileIds);
+                          monthFiles.forEach(file => {
+                            if (e.target.checked) {
+                              newSelectedFileIds.add(file.name);
+                            } else {
+                              newSelectedFileIds.delete(file.name);
+                            }
+                          });
+                          setSelectedFileIds(newSelectedFileIds);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <svg
+                        className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${expandedMonths.has(month) ? 'transform rotate-90' : ''}`}
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path d="M9 5l7 7-7 7"></path>
+                      </svg>
+                      <span className="text-sm text-gray-500">{monthFiles.length} ملف</span>
+                    </div>
+                    <h4 className="font-semibold text-right">{month}</h4>
                   </div>
-                  <h4 className="font-semibold text-right">{file.name}</h4>
-                </div>
-                
-                {/* تفاصيل الملف (تظهر/تختفي عند النقر) */}
-                {expandedFiles.includes(index) && (
-                  <div className="p-3 border-t border-gray-200">
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="bg-white p-2 rounded border border-gray-200">
-                        <div className="text-xs text-gray-500 text-right">المبلغ بالجنيه</div>
-                        <div className="text-sm font-bold text-right">{file.totalAmount.toFixed(2)}</div>
-                      </div>
-                      <div className="bg-white p-2 rounded border border-gray-200">
-                        <div className="text-xs text-gray-500 text-right">كمية USDT</div>
-                        <div className="text-sm font-bold text-right">{file.totalUsdt.toFixed(2)}</div>
-                      </div>
-                      <div className="bg-white p-2 rounded border border-gray-200">
-                        <div className="text-xs text-gray-500 text-right">متوسط السعر</div>
-                        <div className="text-sm font-bold text-right">
-                          {(file.totalUsdt > 0 ? file.totalAmount / file.totalUsdt : 0).toFixed(2)}
+                  
+                  {/* تفاصيل الشهر */}
+                  {expandedMonths.has(month) && (
+                    <div className="p-3 border-t border-gray-200">
+                      <div className="grid grid-cols-3 gap-2 mb-4">
+                        <div className="bg-white p-2 rounded border border-gray-200">
+                          <div className="text-xs text-gray-500 text-right">المبلغ بالجنيه</div>
+                          <div className="text-sm font-bold text-right">{data.totalAmount.toFixed(4)}</div>
+                        </div>
+                        <div className="bg-white p-2 rounded border border-gray-200">
+                          <div className="text-xs text-gray-500 text-right">كمية USDT</div>
+                          <div className="text-sm font-bold text-right">{data.totalUsdt.toFixed(4)}</div>
+                        </div>
+                        <div className="bg-white p-2 rounded border border-gray-200">
+                          <div className="text-xs text-gray-500 text-right">متوسط السعر</div>
+                          <div className="text-sm font-bold text-right">{data.averagePrice.toFixed(4)}</div>
                         </div>
                       </div>
+                      
+                      {/* قائمة الملفات في هذا الشهر */}
+                      <div className="space-y-2">
+                        {monthFiles.map((file, fileIndex) => (
+                          <div key={fileIndex} className="flex items-center justify-between bg-white p-2 rounded border border-gray-200">
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedFileIds.has(file.name)}
+                                onChange={() => toggleFileSelection(file.name)}
+                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                              />
+                              <div>
+                                <div className="text-sm font-medium text-gray-700 text-right">{file.name}</div>
+                                <div className="text-xs text-gray-500 text-right">
+                                  {file.totalAmount.toFixed(4)} جنيه | {file.totalUsdt.toFixed(4)} USDT
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-sm font-semibold text-indigo-600 text-right">
+                              {(file.totalAmount / file.totalUsdt).toFixed(4)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
