@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { FileProcessorService } from '../services/fileProcessorService';
 import { BatchFileSummary, ProcessedFile } from '../types/types';
 import * as XLSX from 'xlsx';
@@ -10,6 +10,8 @@ export const BatchAnalyzerTab: React.FC = () => {
   const [processedFiles, setProcessedFiles] = useState<ProcessedFile[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [totalSelectedFiles, setTotalSelectedFiles] = useState<number>(0);
+  const [expandedFiles, setExpandedFiles] = useState<number[]>([]);
+  const [showAllDetails, setShowAllDetails] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
@@ -94,6 +96,7 @@ export const BatchAnalyzerTab: React.FC = () => {
       // تنظيف النتائج السابقة
       setSummary(null);
       setProcessedFiles([]);
+      setExpandedFiles([]);
       
       // معالجة كل ملف واحد تلو الآخر
       const processedResults: ProcessedFile[] = [];
@@ -212,6 +215,22 @@ export const BatchAnalyzerTab: React.FC = () => {
         });
       });
       
+      // إنشاء ورقة عمل للتحليل الشهري
+      const monthlyData = getMonthlyAnalysisData();
+      const monthlyAnalysisData = [
+        ['الشهر', 'إجمالي المبلغ بالجنيه', 'إجمالي كمية USDT', 'متوسط السعر', 'عدد العمليات']
+      ];
+      
+      Object.entries(monthlyData).forEach(([month, data]) => {
+        monthlyAnalysisData.push([
+          month,
+          data.totalAmount.toFixed(2),
+          data.totalUsdt.toFixed(2),
+          data.averagePrice.toFixed(2),
+          data.count.toString()
+        ]);
+      });
+      
       // إنشاء مصنف إكسل وإضافة أوراق العمل
       const wb = XLSX.utils.book_new();
       
@@ -220,6 +239,9 @@ export const BatchAnalyzerTab: React.FC = () => {
       
       const detailsWs = XLSX.utils.aoa_to_sheet(detailsData);
       XLSX.utils.book_append_sheet(wb, detailsWs, 'التفاصيل');
+      
+      const monthlyAnalysisWs = XLSX.utils.aoa_to_sheet(monthlyAnalysisData);
+      XLSX.utils.book_append_sheet(wb, monthlyAnalysisWs, 'التحليل الشهري');
       
       // حفظ الملف
       const today = new Date().toISOString().split('T')[0];
@@ -230,6 +252,159 @@ export const BatchAnalyzerTab: React.FC = () => {
       console.error('خطأ في تصدير النتائج:', error);
       setProcessingStatus('حدث خطأ أثناء تصدير النتائج');
     }
+  };
+
+  // التبديل بين عرض تفاصيل ملف وإخفائها
+  const toggleFileDetails = (index: number) => {
+    if (expandedFiles.includes(index)) {
+      setExpandedFiles(expandedFiles.filter(i => i !== index));
+    } else {
+      setExpandedFiles([...expandedFiles, index]);
+    }
+  };
+
+  // تبديل حالة عرض جميع التفاصيل
+  const toggleAllDetails = () => {
+    if (showAllDetails) {
+      setExpandedFiles([]);
+    } else {
+      setExpandedFiles(processedFiles.map((_, index) => index));
+    }
+    setShowAllDetails(!showAllDetails);
+  };
+
+  // استخراج تاريخ من اسم الملف
+  const extractDateFromFileName = (fileName: string): Date | null => {
+    // البحث عن نمط مثل: "Financial_Transfers_31-01-2025.xlsx"
+    const datePattern = /(\d{2})[_.-](\d{2})[_.-](\d{4})/;
+    const match = fileName.match(datePattern);
+    
+    if (match) {
+      const day = parseInt(match[1]);
+      const month = parseInt(match[2]);
+      const year = parseInt(match[3]);
+      
+      // التحقق من صحة التاريخ
+      if (day > 0 && day <= 31 && month > 0 && month <= 12) {
+        return new Date(year, month - 1, day);
+      }
+    }
+    
+    return null;
+  };
+
+  // تحليل البيانات الشهرية
+  const getMonthlyAnalysisData = () => {
+    const monthlyData: {
+      [key: string]: {
+        totalAmount: number;
+        totalUsdt: number;
+        averagePrice: number;
+        count: number;
+        month: number;
+        year: number;
+      }
+    } = {};
+    
+    processedFiles.forEach(file => {
+      const date = extractDateFromFileName(file.name);
+      
+      if (date) {
+        const month = date.getMonth() + 1;
+        const year = date.getFullYear();
+        const monthYear = `${month.toString().padStart(2, '0')}/${year}`;
+        
+        if (!monthlyData[monthYear]) {
+          monthlyData[monthYear] = {
+            totalAmount: 0,
+            totalUsdt: 0,
+            averagePrice: 0,
+            count: 0,
+            month,
+            year
+          };
+        }
+        
+        monthlyData[monthYear].totalAmount += file.totalAmount;
+        monthlyData[monthYear].totalUsdt += file.totalUsdt;
+        monthlyData[monthYear].count += file.entryCount;
+      }
+    });
+    
+    // حساب متوسط السعر لكل شهر
+    Object.values(monthlyData).forEach(data => {
+      data.averagePrice = data.totalUsdt > 0 ? data.totalAmount / data.totalUsdt : 0;
+    });
+    
+    // ترتيب البيانات حسب التاريخ (تصاعدياً)
+    const sortedEntries = Object.entries(monthlyData).sort((a, b) => {
+      const aData = a[1];
+      const bData = b[1];
+      
+      if (aData.year !== bData.year) {
+        return aData.year - bData.year;
+      }
+      
+      return aData.month - bData.month;
+    });
+    
+    return Object.fromEntries(sortedEntries);
+  };
+
+  // البيانات المحللة حسب الشهر
+  const monthlyAnalysisData = useMemo(() => {
+    if (!processedFiles.length) return null;
+    return getMonthlyAnalysisData();
+  }, [processedFiles]);
+
+  // رسم تمثيل للبيانات البيانية (تمثيل بسيط)
+  const renderMonthlyChart = () => {
+    if (!monthlyAnalysisData) return null;
+    
+    const months = Object.keys(monthlyAnalysisData);
+    const prices = Object.values(monthlyAnalysisData).map(data => data.averagePrice);
+    
+    // إيجاد أقصى قيمة لتحديد ارتفاع الرسم البياني
+    const maxPrice = Math.max(...prices);
+    
+    return (
+      <div className="bg-white p-4 rounded-lg border border-gray-200 mt-4">
+        <h4 className="text-sm font-semibold mb-3 text-right">تطور متوسط السعر الشهري</h4>
+        <div className="relative h-40 mt-2">
+          <div className="flex items-end justify-between h-32 relative">
+            {months.map((month, index) => {
+              const data = monthlyAnalysisData[month];
+              const height = (data.averagePrice / maxPrice) * 100;
+              
+              return (
+                <div key={month} className="flex flex-col items-center group" style={{ width: `${100 / months.length}%` }}>
+                  <div className="relative w-full text-center">
+                    <div 
+                      className="mx-auto bg-blue-500 hover:bg-blue-600 transition-all duration-200"
+                      style={{ 
+                        height: `${height}%`, 
+                        width: '50%',
+                        minHeight: '4px',
+                        borderTopLeftRadius: '3px',
+                        borderTopRightRadius: '3px'
+                      }}
+                    ></div>
+                    <div className="absolute bottom-0 right-0 left-0 px-1 py-0.5 bg-blue-100 rounded-sm text-blue-700 text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none transform translate-y-full z-10">
+                      {data.averagePrice.toFixed(2)}
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1 transform -rotate-45 origin-top-left">
+                    {month}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* المحور الأفقي */}
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-300"></div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -396,35 +571,99 @@ export const BatchAnalyzerTab: React.FC = () => {
         </div>
       </div>
       
+      {/* تحليل المبيعات الشهري */}
+      {monthlyAnalysisData && Object.keys(monthlyAnalysisData).length > 0 && (
+        <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-8">
+          <h3 className="text-lg font-semibold mb-4 text-right">تحليل المبيعات الشهري</h3>
+          
+          {renderMonthlyChart()}
+          
+          <div className="mt-4 overflow-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الشهر</th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">إجمالي المبلغ بالجنيه</th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">إجمالي كمية USDT</th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">متوسط السعر</th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">عدد العمليات</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {Object.entries(monthlyAnalysisData).map(([month, data], index) => (
+                  <tr key={month} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">{month}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.totalAmount.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.totalUsdt.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.averagePrice.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{data.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      
       {/* قسم تفاصيل الملفات */}
       {processedFiles.length > 0 && (
         <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-4 text-right">تفاصيل الملفات</h3>
+          <div className="flex justify-between items-center mb-4">
+            <button
+              onClick={toggleAllDetails}
+              className="text-xs px-3 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition"
+            >
+              {showAllDetails ? 'طي الكل' : 'عرض الكل'}
+            </button>
+            <h3 className="text-lg font-semibold text-right">تفاصيل الملفات</h3>
+          </div>
           
-          <div className="space-y-4">
+          <div className="space-y-2">
             {processedFiles.map((file, index) => (
-              <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="text-sm text-gray-500">{file.entryCount} عملية</div>
-                  <div className="font-semibold text-right">{file.name}</div>
+              <div key={index} className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+                {/* رأس الملف (قابل للنقر) */}
+                <div
+                  className="flex justify-between items-center p-3 cursor-pointer hover:bg-gray-100 transition"
+                  onClick={() => toggleFileDetails(index)}
+                >
+                  <div className="flex items-center">
+                    <svg
+                      className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${expandedFiles.includes(index) ? 'transform rotate-90' : ''}`}
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path d="M9 5l7 7-7 7"></path>
+                    </svg>
+                    <span className="text-sm text-gray-500 ml-2">{file.entryCount} عملية</span>
+                  </div>
+                  <h4 className="font-semibold text-right">{file.name}</h4>
                 </div>
                 
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-white p-2 rounded border border-gray-200">
-                    <div className="text-xs text-gray-500 text-right">المبلغ بالجنيه</div>
-                    <div className="text-sm font-bold text-right">{file.totalAmount.toFixed(2)}</div>
-                  </div>
-                  <div className="bg-white p-2 rounded border border-gray-200">
-                    <div className="text-xs text-gray-500 text-right">كمية USDT</div>
-                    <div className="text-sm font-bold text-right">{file.totalUsdt.toFixed(2)}</div>
-                  </div>
-                  <div className="bg-white p-2 rounded border border-gray-200">
-                    <div className="text-xs text-gray-500 text-right">متوسط السعر</div>
-                    <div className="text-sm font-bold text-right">
-                      {(file.totalUsdt > 0 ? file.totalAmount / file.totalUsdt : 0).toFixed(2)}
+                {/* تفاصيل الملف (تظهر/تختفي عند النقر) */}
+                {expandedFiles.includes(index) && (
+                  <div className="p-3 border-t border-gray-200">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-white p-2 rounded border border-gray-200">
+                        <div className="text-xs text-gray-500 text-right">المبلغ بالجنيه</div>
+                        <div className="text-sm font-bold text-right">{file.totalAmount.toFixed(2)}</div>
+                      </div>
+                      <div className="bg-white p-2 rounded border border-gray-200">
+                        <div className="text-xs text-gray-500 text-right">كمية USDT</div>
+                        <div className="text-sm font-bold text-right">{file.totalUsdt.toFixed(2)}</div>
+                      </div>
+                      <div className="bg-white p-2 rounded border border-gray-200">
+                        <div className="text-xs text-gray-500 text-right">متوسط السعر</div>
+                        <div className="text-sm font-bold text-right">
+                          {(file.totalUsdt > 0 ? file.totalAmount / file.totalUsdt : 0).toFixed(2)}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
