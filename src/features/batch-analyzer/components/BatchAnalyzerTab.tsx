@@ -44,6 +44,34 @@ export const BatchAnalyzerTab: React.FC = () => {
     setProcessingStatus(`تم إضافة ${excelFiles.length} ملف. الإجمالي: ${totalSelectedFiles + excelFiles.length} ملف`);
   };
 
+  // استيراد مجلد
+  const handleFolderImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    // الحصول على قائمة ملفات الإكسل من المجلد
+    const excelFiles = Array.from(files).filter(file => 
+      file.name.toLowerCase().endsWith('.xlsx') || 
+      file.name.toLowerCase().endsWith('.xls')
+    );
+    
+    if (excelFiles.length === 0) {
+      setProcessingStatus('لم يتم العثور على ملفات إكسل في المجلد المحدد');
+      return;
+    }
+    
+    setSelectedFiles(prev => [...prev, ...excelFiles]);
+    setTotalSelectedFiles(prev => prev + excelFiles.length);
+    
+    // إعادة تعيين حقل الإدخال
+    if (folderInputRef.current) {
+      folderInputRef.current.value = '';
+    }
+    
+    // عرض رسالة للمستخدم
+    setProcessingStatus(`تم إضافة ${excelFiles.length} ملف من المجلد. الإجمالي: ${totalSelectedFiles + excelFiles.length} ملف`);
+  };
+
   // معالجة الملفات
   const processSelectedFiles = async () => {
     if (selectedFiles.length === 0) {
@@ -233,7 +261,33 @@ export const BatchAnalyzerTab: React.FC = () => {
                 </label>
               </div>
               <p className="text-xs text-gray-500 mt-1 text-right">
-                يمكنك اختيار عدة ملفات بالضغط على Ctrl أثناء الاختيار، أو اختيار مجلد كامل بتحديد كل الملفات داخله
+                يمكنك اختيار عدة ملفات بالضغط على Ctrl أثناء الاختيار
+              </p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                اختيار مجلد كامل
+              </label>
+              <div className="flex">
+                <label className="flex-1 cursor-pointer bg-white text-center py-2 px-4 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 transition">
+                  <span className="text-indigo-600">اختيار مجلد</span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    multiple
+                    /* @ts-ignore */
+                    directory=""
+                    webkitdirectory=""
+                    onChange={handleFolderImport}
+                    className="hidden"
+                    ref={folderInputRef}
+                    disabled={isProcessing}
+                  />
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 text-right">
+                يمكنك اختيار مجلد واحد في كل مرة، ويمكنك تكرار العملية عدة مرات لإضافة محتويات مجلدات أخرى
               </p>
             </div>
 
@@ -282,12 +336,14 @@ export const BatchAnalyzerTab: React.FC = () => {
 
           {/* إرشادات استخدام التطبيق */}
           <div className="mt-6 p-3 bg-yellow-50 rounded-lg border border-yellow-100">
-            <h4 className="text-sm font-semibold text-right text-yellow-800 mb-2">إرشادات الاستخدام:</h4>
+            <h4 className="text-sm font-semibold text-right text-yellow-800 mb-2">ملاحظة مهمة:</h4>
+            <p className="text-xs text-yellow-700 text-right mb-2">
+              تقنيًا، المتصفحات لا تدعم اختيار عدة مجلدات دفعة واحدة. يمكنك اختيار مجلد واحد، ثم تكرار العملية عدة مرات لإضافة محتويات مجلدات أخرى.
+            </p>
             <ul className="text-xs text-yellow-700 space-y-1 pr-5 list-disc text-right">
-              <li>لاختيار مجلد كامل: قم بفتح المجلد أولا ثم اضغط Ctrl+A لتحديد جميع الملفات ثم اضغط "فتح"</li>
-              <li>يمكنك تكرار العملية عدة مرات لإضافة ملفات من مجلدات متعددة</li>
-              <li>يتم فلترة ملفات الإكسل فقط (xlsx, xls) وتجاهل أي ملفات أخرى</li>
-              <li>بعد اختيار كل الملفات المطلوبة، اضغط على زر "معالجة" لبدء التحليل</li>
+              <li>اضغط على "اختيار مجلد" لتحديد مجلد كامل (سيتم تحميل جميع ملفات الإكسل داخل هذا المجلد وجميع مجلداته الفرعية تلقائيًا)</li>
+              <li>كرر الخطوة السابقة لإضافة محتويات مجلدات أخرى</li>
+              <li>بعد اختيار كل المجلدات المطلوبة، اضغط على "معالجة" للبدء في تحليل البيانات</li>
             </ul>
           </div>
         </div>
