@@ -25,17 +25,24 @@ const createSignature = (queryString: string, secretKey: string): string => {
 };
 
 export const handler: Handler = async (event) => {
+  // استخراج الأصل من رأس الطلب
+  const origin = event.headers.origin || 'http://localhost:3003';
+  console.log('Request origin:', origin);
+  
   // تكوين رؤوس CORS للبيئة المحلية
   const headers = {
-    'Access-Control-Allow-Origin': 'http://localhost:3002',
+    'Access-Control-Allow-Origin': origin.includes('localhost') ? origin : 'https://evoucher.netlify.app',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Accept, Origin, X-MBX-APIKEY',
     'Access-Control-Allow-Credentials': 'true',
     'Content-Type': 'application/json'
   };
+  
+  console.log('Request received:', event.httpMethod, event.path);
 
   // معالجة طلبات OPTIONS مباشرة
   if (event.httpMethod === 'OPTIONS') {
+    console.log('Handling OPTIONS request');
     return {
       statusCode: 204,
       headers,
@@ -44,6 +51,7 @@ export const handler: Handler = async (event) => {
   }
 
   if (event.httpMethod !== 'POST') {
+    console.log('Method Not Allowed:', event.httpMethod);
     return {
       statusCode: 405,
       headers,
@@ -53,12 +61,15 @@ export const handler: Handler = async (event) => {
 
   try {
     if (!event.body) {
+      console.log('Missing request body');
       throw new Error('Request body is required');
     }
 
+    console.log('Request body received, parsing...');
     const { apiKey, secretKey, endpoint, params = {} } = JSON.parse(event.body) as BinanceRequestParams;
 
     if (!apiKey || !secretKey) {
+      console.log('Missing API Key or Secret Key');
       throw new Error('API Key and Secret Key are required');
     }
 
@@ -92,32 +103,60 @@ export const handler: Handler = async (event) => {
       requestHeaders['X-MBX-APIKEY'] = apiKey;
     }
 
-    const response = await fetch(requestUrl, {
-      method: 'GET',
-      headers: requestHeaders,
-      agent,
-      timeout: 30000
-    });
-
-    console.log('Response status:', response.status);
-    const responseText = await response.text();
-    console.log('Raw response:', responseText);
-
+    console.log('Request headers:', JSON.stringify(requestHeaders, null, 2));
+    
     try {
-      const data = JSON.parse(responseText);
-      return {
-        statusCode: response.status,
-        headers,
-        body: JSON.stringify(data)
-      };
-    } catch (parseError) {
-      console.error('Failed to parse response:', parseError);
+      const response = await fetch(requestUrl, {
+        method: 'GET',
+        headers: requestHeaders,
+        agent,
+        timeout: 30000
+      });
+
+      console.log('Response status:', response.status);
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      try {
+        if (responseText.trim() === '') {
+          console.log('Empty response received');
+          return {
+            statusCode: 502,
+            headers,
+            body: JSON.stringify({ 
+              error: 'Empty response from Binance API',
+              endpoint: endpoint
+            })
+          };
+        }
+        
+        const data = JSON.parse(responseText);
+        return {
+          statusCode: response.status,
+          headers,
+          body: JSON.stringify(data)
+        };
+      } catch (parseError) {
+        console.error('Failed to parse response:', parseError);
+        return {
+          statusCode: 502,
+          headers,
+          body: JSON.stringify({
+            error: 'Invalid response format from Binance API',
+            rawResponse: responseText,
+            parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error'
+          })
+        };
+      }
+    } catch (fetchError) {
+      console.error('Fetch error:', fetchError);
       return {
         statusCode: 502,
         headers,
-        body: JSON.stringify({
-          error: 'Invalid response format from Binance API',
-          rawResponse: responseText
+        body: JSON.stringify({ 
+          error: 'Failed to fetch from Binance API',
+          details: fetchError instanceof Error ? fetchError.message : 'Unknown fetch error',
+          url: requestUrl 
         })
       };
     }
