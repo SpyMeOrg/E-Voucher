@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FileProcessorService } from '../services/fileProcessorService';
 import { BatchFileSummary, ProcessedFile } from '../types/types';
 import * as XLSX from 'xlsx';
@@ -8,15 +8,21 @@ export const BatchAnalyzerTab: React.FC = () => {
   const [processingStatus, setProcessingStatus] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [processedFiles, setProcessedFiles] = useState<ProcessedFile[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [totalSelectedFiles, setTotalSelectedFiles] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const multipleFoldersInputRef = useRef<HTMLInputElement>(null);
 
   // استيراد ملفات متعددة
   const handleFilesImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    await processFiles(Array.from(files));
+    // تجميع الملفات المحددة
+    const newFiles = Array.from(files);
+    setSelectedFiles(prev => [...prev, ...newFiles]);
+    setTotalSelectedFiles(prev => prev + newFiles.length);
     
     // إعادة تعيين حقل الإدخال
     if (fileInputRef.current) {
@@ -31,7 +37,8 @@ export const BatchAnalyzerTab: React.FC = () => {
     
     // الحصول على قائمة ملفات الإكسل من المجلد
     const excelFiles = Array.from(files).filter(file => 
-      file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
+      file.name.toLowerCase().endsWith('.xlsx') || 
+      file.name.toLowerCase().endsWith('.xls')
     );
     
     if (excelFiles.length === 0) {
@@ -39,7 +46,9 @@ export const BatchAnalyzerTab: React.FC = () => {
       return;
     }
     
-    await processFiles(excelFiles);
+    // تجميع الملفات المحددة
+    setSelectedFiles(prev => [...prev, ...excelFiles]);
+    setTotalSelectedFiles(prev => prev + excelFiles.length);
     
     // إعادة تعيين حقل الإدخال
     if (folderInputRef.current) {
@@ -47,7 +56,46 @@ export const BatchAnalyzerTab: React.FC = () => {
     }
   };
 
+  // استيراد عدة مجلدات
+  const handleMultipleFoldersImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    // الحصول على قائمة ملفات الإكسل من المجلدات
+    const excelFiles = Array.from(files).filter(file => 
+      file.name.toLowerCase().endsWith('.xlsx') || 
+      file.name.toLowerCase().endsWith('.xls')
+    );
+    
+    if (excelFiles.length === 0) {
+      setProcessingStatus('لم يتم العثور على ملفات إكسل في المجلدات المحددة');
+      return;
+    }
+    
+    // تجميع الملفات المحددة
+    setSelectedFiles(prev => [...prev, ...excelFiles]);
+    setTotalSelectedFiles(prev => prev + excelFiles.length);
+    
+    // إعادة تعيين حقل الإدخال
+    if (multipleFoldersInputRef.current) {
+      multipleFoldersInputRef.current.value = '';
+    }
+  };
+
   // معالجة الملفات
+  const processSelectedFiles = async () => {
+    if (selectedFiles.length === 0) {
+      setProcessingStatus('لم يتم اختيار أي ملفات للمعالجة');
+      return;
+    }
+
+    await processFiles(selectedFiles);
+    // تنظيف الملفات المحددة بعد المعالجة
+    setSelectedFiles([]);
+    setTotalSelectedFiles(0);
+  };
+
+  // معالجة الملفات المحددة
   const processFiles = async (files: File[]) => {
     try {
       setIsProcessing(true);
@@ -65,8 +113,13 @@ export const BatchAnalyzerTab: React.FC = () => {
         setProcessingStatus(`جاري معالجة الملف ${i + 1} من ${files.length}: ${file.name}`);
         
         try {
-          const result = await FileProcessorService.processExcelFile(file);
-          processedResults.push(result);
+          // فحص امتداد الملف قبل المعالجة
+          if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+            const result = await FileProcessorService.processExcelFile(file);
+            processedResults.push(result);
+          } else {
+            console.warn(`تم تجاهل الملف ${file.name} لأنه ليس ملف إكسل`);
+          }
         } catch (error) {
           console.error(`خطأ في معالجة الملف ${file.name}:`, error);
           // استمر في المعالجة حتى مع وجود خطأ
@@ -101,6 +154,13 @@ export const BatchAnalyzerTab: React.FC = () => {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // مسح الملفات المحددة
+  const clearSelectedFiles = () => {
+    setSelectedFiles([]);
+    setTotalSelectedFiles(0);
+    setProcessingStatus('تم مسح قائمة الملفات المحددة');
   };
 
   // تصدير النتائج إلى ملف إكسل
@@ -234,6 +294,59 @@ export const BatchAnalyzerTab: React.FC = () => {
                 </label>
               </div>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                اختيار مجلد آخر (تجميع)
+              </label>
+              <div className="flex">
+                <label className="flex-1 cursor-pointer bg-white text-center py-2 px-4 border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 transition">
+                  <span className="text-indigo-600">إضافة مجلد آخر</span>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    multiple
+                    /* @ts-ignore */
+                    directory=""
+                    webkitdirectory=""
+                    onChange={handleMultipleFoldersImport}
+                    className="hidden"
+                    ref={multipleFoldersInputRef}
+                    disabled={isProcessing}
+                  />
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 text-right">
+                يمكنك إضافة أكثر من مجلد واحدًا تلو الآخر، ثم معالجتهم جميعًا معًا
+              </p>
+            </div>
+
+            {/* عرض عدد الملفات المحددة */}
+            {totalSelectedFiles > 0 && (
+              <div className="bg-blue-50 p-3 rounded-md border border-blue-200 mt-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex space-x-2 rtl:space-x-reverse">
+                    <button
+                      onClick={clearSelectedFiles}
+                      className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition"
+                      disabled={isProcessing}
+                    >
+                      مسح
+                    </button>
+                    <button
+                      onClick={processSelectedFiles}
+                      className="text-xs px-2 py-1 bg-green-100 text-green-600 rounded hover:bg-green-200 transition"
+                      disabled={isProcessing}
+                    >
+                      معالجة
+                    </button>
+                  </div>
+                  <div className="text-sm text-blue-600 font-medium text-right">
+                    تم اختيار {totalSelectedFiles} ملف
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           
           {/* حالة المعالجة */}
