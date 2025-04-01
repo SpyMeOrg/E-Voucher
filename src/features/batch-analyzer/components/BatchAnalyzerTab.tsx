@@ -2,6 +2,18 @@ import React, { useState, useRef, useMemo } from 'react';
 import { FileProcessorService } from '../services/fileProcessorService';
 import { BatchFileSummary, ProcessedFile } from '../types/types';
 import * as XLSX from 'xlsx';
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ComposedChart,
+  Bar,
+  Line,
+  Area
+} from 'recharts';
 
 export const BatchAnalyzerTab: React.FC = () => {
   const [summary, setSummary] = useState<BatchFileSummary | null>(null);
@@ -394,9 +406,14 @@ export const BatchAnalyzerTab: React.FC = () => {
         count: number;
         month: number;
         year: number;
+        minPrice: number;
+        maxPrice: number;
+        priceChange: number;
+        volumeChange: number;
       }
     } = {};
     
+    // تجميع البيانات حسب الشهر
     processedFiles.forEach(file => {
       const date = extractDateFromFileName(file.name);
       
@@ -412,34 +429,55 @@ export const BatchAnalyzerTab: React.FC = () => {
             averagePrice: 0,
             count: 0,
             month,
-            year
+            year,
+            minPrice: Infinity,
+            maxPrice: -Infinity,
+            priceChange: 0,
+            volumeChange: 0
           };
         }
         
+        // تحديث البيانات الإجمالية
         monthlyData[monthYear].totalAmount += file.totalAmount;
         monthlyData[monthYear].totalUsdt += file.totalUsdt;
         monthlyData[monthYear].count += file.entryCount;
+
+        // حساب أقل وأعلى سعر
+        file.entries.forEach(entry => {
+          const price = entry.price;
+          monthlyData[monthYear].minPrice = Math.min(monthlyData[monthYear].minPrice, price);
+          monthlyData[monthYear].maxPrice = Math.max(monthlyData[monthYear].maxPrice, price);
+        });
       }
     });
     
-    // حساب متوسط السعر لكل شهر
-    Object.values(monthlyData).forEach(data => {
+    // حساب المتوسطات والتغيرات
+    const sortedMonths = Object.keys(monthlyData).sort((a, b) => {
+      const [monthA, yearA] = a.split('/').map(Number);
+      const [monthB, yearB] = b.split('/').map(Number);
+      return yearA === yearB ? monthA - monthB : yearA - yearB;
+    });
+
+    let previousMonth: string | null = null;
+    sortedMonths.forEach(month => {
+      const data = monthlyData[month];
+      
+      // حساب متوسط السعر
       data.averagePrice = data.totalUsdt > 0 ? data.totalAmount / data.totalUsdt : 0;
-    });
-    
-    // ترتيب البيانات حسب التاريخ (تصاعدياً)
-    const sortedEntries = Object.entries(monthlyData).sort((a, b) => {
-      const aData = a[1];
-      const bData = b[1];
       
-      if (aData.year !== bData.year) {
-        return aData.year - bData.year;
+      // حساب التغير في السعر والحجم
+      if (previousMonth) {
+        const prevData = monthlyData[previousMonth];
+        data.priceChange = ((data.averagePrice - prevData.averagePrice) / prevData.averagePrice) * 100;
+        data.volumeChange = ((data.totalUsdt - prevData.totalUsdt) / prevData.totalUsdt) * 100;
       }
       
-      return aData.month - bData.month;
+      previousMonth = month;
     });
     
-    return Object.fromEntries(sortedEntries);
+    return Object.fromEntries(
+      sortedMonths.map(month => [month, monthlyData[month]])
+    );
   };
 
   // البيانات المحللة حسب الشهر
@@ -448,51 +486,194 @@ export const BatchAnalyzerTab: React.FC = () => {
     return getMonthlyAnalysisData();
   }, [processedFiles]);
 
-  // رسم تمثيل للبيانات البيانية (تمثيل بسيط)
+  // رسم تمثيل للبيانات البيانية
   const renderMonthlyChart = () => {
     if (!monthlyAnalysisData) return null;
-    
-    const months = Object.keys(monthlyAnalysisData);
-    const prices = Object.values(monthlyAnalysisData).map(data => data.averagePrice);
-    
-    // إيجاد أقصى قيمة لتحديد ارتفاع الرسم البياني
-    const maxPrice = Math.max(...prices);
-    
-    return (
-      <div className="bg-white p-4 rounded-lg border border-gray-200 mt-4">
-        <h4 className="text-sm font-semibold mb-3 text-right">تطور متوسط السعر الشهري</h4>
-        <div className="relative h-40 mt-2">
-          <div className="flex items-end justify-between h-32 relative">
-            {months.map((month) => {
-              const data = monthlyAnalysisData[month];
-              const height = (data.averagePrice / maxPrice) * 100;
-              
-              return (
-                <div key={month} className="flex flex-col items-center group" style={{ width: `${100 / months.length}%` }}>
-                  <div className="relative w-full text-center">
-                    <div 
-                      className="mx-auto bg-blue-500 hover:bg-blue-600 transition-all duration-200"
-                      style={{ 
-                        height: `${height}%`, 
-                        width: '50%',
-                        minHeight: '4px',
-                        borderTopLeftRadius: '3px',
-                        borderTopRightRadius: '3px'
-                      }}
-                    ></div>
-                    <div className="absolute bottom-0 right-0 left-0 px-1 py-0.5 bg-blue-100 rounded-sm text-blue-700 text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none transform translate-y-full z-10">
-                      {data.averagePrice.toFixed(4)}
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1 transform -rotate-45 origin-top-left">
-                    {month}
-                  </div>
-                </div>
-              );
-            })}
+
+    const chartData = Object.entries(monthlyAnalysisData).map(([month, data]) => ({
+      month,
+      averagePrice: parseFloat(data.averagePrice.toFixed(4)),
+      minPrice: parseFloat(data.minPrice.toFixed(4)),
+      maxPrice: parseFloat(data.maxPrice.toFixed(4)),
+      volume: parseFloat(data.totalUsdt.toFixed(4)),
+      priceChange: parseFloat(data.priceChange.toFixed(2)),
+      volumeChange: parseFloat(data.volumeChange.toFixed(2))
+    }));
+
+    const CustomTooltip = ({ active, payload, label }: any) => {
+      if (active && payload && payload.length) {
+        return (
+          <div className="bg-white p-3 border border-gray-200 rounded shadow-lg">
+            <p className="text-sm font-semibold mb-2 text-right">{label}</p>
+            <div className="space-y-1 text-xs">
+              <p className="text-right">
+                <span className="text-gray-500">متوسط السعر:</span>
+                <span className="font-semibold mr-1">{payload[0].value}</span>
+              </p>
+              <p className="text-right">
+                <span className="text-gray-500">أقل سعر:</span>
+                <span className="font-semibold mr-1">{payload[1].value}</span>
+              </p>
+              <p className="text-right">
+                <span className="text-gray-500">أعلى سعر:</span>
+                <span className="font-semibold mr-1">{payload[2].value}</span>
+              </p>
+              <p className="text-right">
+                <span className="text-gray-500">حجم التداول:</span>
+                <span className="font-semibold mr-1">{payload[3].value} USDT</span>
+              </p>
+              <p className="text-right">
+                <span className="text-gray-500">التغير في السعر:</span>
+                <span className={`font-semibold mr-1 ${payload[4].value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {payload[4].value > 0 ? '+' : ''}{payload[4].value}%
+                </span>
+              </p>
+              <p className="text-right">
+                <span className="text-gray-500">التغير في الحجم:</span>
+                <span className={`font-semibold mr-1 ${payload[5].value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {payload[5].value > 0 ? '+' : ''}{payload[5].value}%
+                </span>
+              </p>
+            </div>
           </div>
-          {/* المحور الأفقي */}
-          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-300"></div>
+        );
+      }
+      return null;
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* الرسم البياني الرئيسي */}
+        <div className="bg-white p-4 rounded-lg border border-gray-200">
+          <h4 className="text-sm font-semibold mb-3 text-right">تطور متوسط السعر الشهري</h4>
+          <div className="h-[400px] mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis 
+                  dataKey="month" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                />
+                <YAxis 
+                  yAxisId="left"
+                  orientation="left"
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                  label={{ 
+                    value: 'السعر', 
+                    angle: -90, 
+                    position: 'insideLeft',
+                    style: { fill: '#6B7280' }
+                  }}
+                />
+                <YAxis 
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                  label={{ 
+                    value: 'USDT حجم التداول', 
+                    angle: 90, 
+                    position: 'insideRight',
+                    style: { fill: '#6B7280' }
+                  }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend verticalAlign="top" height={36} />
+                <Area
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="maxPrice"
+                  fill="#E5E7EB"
+                  stroke="#9CA3AF"
+                  name="نطاق السعر"
+                  strokeWidth={1}
+                />
+                <Area
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="minPrice"
+                  fill="#F3F4F6"
+                  stroke="#9CA3AF"
+                  strokeWidth={1}
+                />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="averagePrice"
+                  stroke="#4F46E5"
+                  strokeWidth={2}
+                  name="متوسط السعر"
+                  dot={{ fill: '#4F46E5', r: 4 }}
+                  activeDot={{ r: 6, fill: '#4F46E5' }}
+                />
+                <Bar
+                  yAxisId="right"
+                  dataKey="volume"
+                  fill="#93C5FD"
+                  opacity={0.6}
+                  name="حجم التداول"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* رسم بياني للتغيرات */}
+        <div className="bg-white p-4 rounded-lg border border-gray-200">
+          <h4 className="text-sm font-semibold mb-3 text-right">التغيرات الشهرية في السعر والحجم</h4>
+          <div className="h-[300px] mt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis 
+                  dataKey="month" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                />
+                <YAxis 
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                  label={{ 
+                    value: 'نسبة التغير %', 
+                    angle: -90, 
+                    position: 'insideLeft',
+                    style: { fill: '#6B7280' }
+                  }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend verticalAlign="top" height={36} />
+                <Bar
+                  dataKey="priceChange"
+                  fill="#34D399"
+                  opacity={0.8}
+                  name="التغير في السعر"
+                />
+                <Bar
+                  dataKey="volumeChange"
+                  fill="#818CF8"
+                  opacity={0.8}
+                  name="التغير في الحجم"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="priceChange"
+                  stroke="#059669"
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="volumeChange"
+                  stroke="#4F46E5"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     );
