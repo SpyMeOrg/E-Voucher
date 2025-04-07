@@ -40,8 +40,23 @@ export const LocalModeTab: React.FC = () => {
   // تشغيل الخادم المحلي
   const startLocalServer = () => {
     try {
-      window.location.href = 'binance-local://start';
-      setTimeout(checkBackendStatus, 2000); // التحقق بعد ثانيتين
+      // استخدام WebSocket بدلاً من البروتوكول المخصص
+      const ws = new WebSocket('ws://localhost:5000/ws');
+      
+      ws.onopen = () => {
+        console.log('تم الاتصال بالخادم المحلي');
+        setBackendStatus('running');
+      };
+      
+      ws.onclose = () => {
+        console.log('تم إغلاق الاتصال بالخادم المحلي');
+        setBackendStatus('stopped');
+      };
+      
+      ws.onerror = (error) => {
+        console.error('خطأ في الاتصال بالخادم المحلي:', error);
+        setBackendStatus('stopped');
+      };
     } catch (error) {
       console.error('فشل تشغيل الخادم المحلي:', error);
     }
@@ -123,15 +138,6 @@ export const LocalModeTab: React.FC = () => {
               <p className="text-blue-600 text-sm">
                 الوضع المحلي يقوم بتشغيل خادم API محلي على جهازك، مما يسمح للتطبيق بالاتصال به بدلاً من الخادم البعيد. هذا يحل مشكلة التعارض بين بينانس ونتليفاي.
               </p>
-            </div>
-            
-            <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-100">
-              <h4 className="font-medium text-yellow-700 mb-2">متطلبات التشغيل</h4>
-              <ul className="text-yellow-600 text-sm list-disc list-inside space-y-1">
-                <li>يجب تثبيت Node.js على جهازك</li>
-                <li>تأكد من تسجيل بروتوكول binance-local على نظام التشغيل</li>
-                <li>قد تحتاج إلى إعطاء أذونات إضافية عند تشغيل الخادم لأول مرة</li>
-              </ul>
             </div>
             
             <div className="p-4 bg-green-50 rounded-lg border border-green-100">
