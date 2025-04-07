@@ -1,13 +1,115 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+// كلاس محاكاة خادم WebSocket محلي
+class MockWebSocketServer {
+  private clients: Array<{
+    send: (data: string) => void;
+    onmessage?: (event: { data: string }) => void;
+    onclose?: () => void;
+  }> = [];
+  
+  private isRunning = false;
+  private onStatusChange?: (status: 'running' | 'stopped') => void;
+  private onLog?: (message: string) => void;
+  
+  constructor(onStatusChange?: (status: 'running' | 'stopped') => void, onLog?: (message: string) => void) {
+    this.onStatusChange = onStatusChange;
+    this.onLog = onLog;
+  }
+  
+  start() {
+    this.isRunning = true;
+    this.onLog?.('تم تشغيل الخادم المحلي المحاكي');
+    this.onStatusChange?.('running');
+    return true;
+  }
+  
+  stop() {
+    this.isRunning = false;
+    this.clients.forEach(client => client.onclose?.());
+    this.clients = [];
+    this.onLog?.('تم إيقاف الخادم المحلي المحاكي');
+    this.onStatusChange?.('stopped');
+  }
+  
+  connect() {
+    if (!this.isRunning) {
+      throw new Error('الخادم غير مشغل');
+    }
+    
+    this.onLog?.('تم اتصال عميل جديد بالخادم المحلي');
+    
+    const mockSocket = {
+      send: (data: string) => {
+        this.onLog?.(`العميل أرسل: ${data}`);
+        if (this.isRunning) {
+          try {
+            const parsedData = JSON.parse(data);
+            if (parsedData.type === 'ping') {
+              setTimeout(() => {
+                mockSocket.onmessage?.({
+                  data: JSON.stringify({
+                    type: 'pong',
+                    timestamp: Date.now(),
+                    message: 'الخادم المحلي يعمل'
+                  })
+                });
+              }, 500);
+            }
+          } catch (e) {
+            console.error('خطأ في معالجة البيانات:', e);
+          }
+        }
+      },
+      onmessage: undefined as ((event: { data: string }) => void) | undefined,
+      onclose: undefined as (() => void) | undefined,
+      close: () => {
+        const index = this.clients.indexOf(mockSocket);
+        if (index > -1) {
+          this.clients.splice(index, 1);
+          this.onLog?.('تم إغلاق اتصال العميل بالخادم المحلي');
+          mockSocket.onclose?.();
+        }
+      }
+    };
+    
+    this.clients.push(mockSocket);
+    return mockSocket;
+  }
+  
+  isActive() {
+    return this.isRunning;
+  }
+}
+
+// المكون الرئيسي
 export const LocalModeTab: React.FC = () => {
   const [isLocalModeActive, setIsLocalModeActive] = useState<boolean>(() => {
     return localStorage.getItem('localModeActive') === 'true';
   });
   const [backendStatus, setBackendStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
   const [serverLog, setServerLog] = useState<string[]>([]);
-  const wsServerRef = useRef<WebSocket | null>(null);
-  const wsClientRef = useRef<WebSocket | null>(null);
+  const serverRef = useRef<MockWebSocketServer | null>(null);
+  const clientRef = useRef<ReturnType<MockWebSocketServer['connect']> | null>(null);
+
+  // إعداد الخادم المحاكي عند تحميل المكون
+  useEffect(() => {
+    serverRef.current = new MockWebSocketServer(
+      (status) => setBackendStatus(status),
+      (message) => addLog(message)
+    );
+    
+    // تحقق من الحالة المحفوظة
+    if (isLocalModeActive) {
+      setTimeout(() => startLocalServer(), 500);
+    }
+    
+    return () => {
+      if (serverRef.current?.isActive()) {
+        serverRef.current.stop();
+      }
+    };
+  }, []);
 
   // حفظ حالة الوضع المحلي
   useEffect(() => {
@@ -19,81 +121,48 @@ export const LocalModeTab: React.FC = () => {
     setServerLog(prev => [...prev, `${new Date().toLocaleTimeString()} - ${message}`]);
   };
 
-  // إنشاء خادم WebSocket بسيط
-  const createLocalServer = () => {
-    try {
-      // إنشاء خادم WebSocket بسيط
-      const server = new WebSocket('ws://localhost:5000/ws');
-      
-      server.onopen = () => {
-        addLog('تم إنشاء الخادم المحلي بنجاح');
-        setBackendStatus('running');
-      };
-      
-      server.onmessage = (event) => {
-        addLog(`تم استلام رسالة: ${event.data}`);
-        // معالجة الرسائل الواردة
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'ping') {
-            server.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
-          }
-        } catch (error) {
-          console.error('خطأ في معالجة الرسالة:', error);
-        }
-      };
-      
-      server.onclose = () => {
-        addLog('تم إغلاق الخادم المحلي');
-        setBackendStatus('stopped');
-      };
-      
-      server.onerror = (error) => {
-        addLog(`خطأ في الخادم المحلي: ${error}`);
-        setBackendStatus('stopped');
-      };
-      
-      wsServerRef.current = server;
-    } catch (error) {
-      console.error('فشل إنشاء الخادم المحلي:', error);
-      addLog(`فشل إنشاء الخادم المحلي: ${error}`);
-    }
-  };
-
   // تشغيل الخادم المحلي
   const startLocalServer = () => {
     try {
       addLog('جاري تشغيل الخادم المحلي...');
       
-      // إنشاء اتصال WebSocket للعميل
-      const client = new WebSocket('ws://localhost:5000/ws');
+      if (!serverRef.current) {
+        serverRef.current = new MockWebSocketServer(
+          (status) => setBackendStatus(status),
+          (message) => addLog(message)
+        );
+      }
       
-      client.onopen = () => {
-        addLog('تم الاتصال بالخادم المحلي');
-        setBackendStatus('running');
+      if (serverRef.current.isActive()) {
+        addLog('الخادم المحلي مشغل بالفعل');
+      } else {
+        // تشغيل الخادم المحاكي
+        const success = serverRef.current.start();
         
-        // إرسال رسالة ping للتحقق من عمل الخادم
-        client.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
-      };
-      
-      client.onmessage = (event) => {
-        addLog(`تم استلام رد: ${event.data}`);
-      };
-      
-      client.onclose = () => {
-        addLog('تم إغلاق الاتصال بالخادم المحلي');
-        setBackendStatus('stopped');
-      };
-      
-      client.onerror = (error) => {
-        addLog(`خطأ في الاتصال بالخادم المحلي: ${error}`);
-        setBackendStatus('stopped');
-      };
-      
-      wsClientRef.current = client;
-      
-      // إنشاء الخادم المحلي
-      createLocalServer();
+        if (success) {
+          try {
+            // اتصال عميل بالخادم المحلي
+            clientRef.current = serverRef.current.connect();
+            
+            clientRef.current.onmessage = (event) => {
+              addLog(`تم استلام رد: ${event.data}`);
+            };
+            
+            clientRef.current.onclose = () => {
+              addLog('تم إغلاق الاتصال بالخادم المحلي');
+              setBackendStatus('stopped');
+            };
+            
+            // إرسال رسالة ping للتحقق
+            clientRef.current.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+            
+            setIsLocalModeActive(true);
+          } catch (error) {
+            addLog(`خطأ في الاتصال بالخادم المحلي: ${error}`);
+            setBackendStatus('stopped');
+          }
+        }
+      }
     } catch (error) {
       console.error('فشل تشغيل الخادم المحلي:', error);
       addLog(`فشل تشغيل الخادم المحلي: ${error}`);
@@ -106,31 +175,20 @@ export const LocalModeTab: React.FC = () => {
     if (e.target.checked) {
       startLocalServer();
     } else {
-      // إغلاق الاتصالات عند تعطيل الوضع المحلي
-      if (wsServerRef.current) {
-        wsServerRef.current.close();
-        wsServerRef.current = null;
+      // إيقاف الخادم المحلي
+      if (clientRef.current) {
+        clientRef.current.close();
+        clientRef.current = null;
       }
-      if (wsClientRef.current) {
-        wsClientRef.current.close();
-        wsClientRef.current = null;
+      
+      if (serverRef.current) {
+        serverRef.current.stop();
       }
+      
       setBackendStatus('stopped');
       addLog('تم تعطيل الوضع المحلي');
     }
   };
-
-  // تنظيف الاتصالات عند إزالة المكون
-  useEffect(() => {
-    return () => {
-      if (wsServerRef.current) {
-        wsServerRef.current.close();
-      }
-      if (wsClientRef.current) {
-        wsClientRef.current.close();
-      }
-    };
-  }, []);
 
   return (
     <div className="relative bg-white backdrop-blur-sm bg-opacity-90 shadow-2xl rounded-2xl p-4 sm:p-8 lg:p-12 mx-auto border border-gray-100 mb-8">
@@ -221,14 +279,14 @@ export const LocalModeTab: React.FC = () => {
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
               <h4 className="font-medium text-blue-700 mb-2">كيف يعمل الوضع المحلي؟</h4>
               <p className="text-blue-600 text-sm">
-                الوضع المحلي يقوم بتشغيل خادم API محلي على جهازك، مما يسمح للتطبيق بالاتصال به بدلاً من الخادم البعيد. هذا يحل مشكلة التعارض بين بينانس ونتليفاي.
+                الوضع المحلي يقوم بتشغيل محاكاة لخادم API محلي في المتصفح نفسه، مما يسمح للتطبيق بمعالجة البيانات محليًا. هذا يحل مشكلة التعارض بين بينانس ونتليفاي دون الحاجة لتثبيت أي برامج.
               </p>
             </div>
             
             <div className="p-4 bg-green-50 rounded-lg border border-green-100">
               <h4 className="font-medium text-green-700 mb-2">فوائد الوضع المحلي</h4>
               <ul className="text-green-600 text-sm list-disc list-inside space-y-1">
-                <li>يعمل مع نطاق أو بدون نطاق</li>
+                <li>يعمل مباشرة في المتصفح بدون أي متطلبات خارجية</li>
                 <li>أمان إضافي حيث تبقى البيانات على جهازك</li>
                 <li>أداء أفضل لعمليات معالجة البيانات</li>
                 <li>إمكانية العمل دون اتصال بالإنترنت (للوظائف المحلية)</li>
