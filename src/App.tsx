@@ -4,6 +4,7 @@ import { exportToExcel } from './utils/excelExport';
 import { BinanceTab } from './features/binance/components/BinanceTab';
 import { AveragePriceTab } from './features/average-price/components/AveragePriceTab';
 import { BatchAnalyzerTab } from './features/batch-analyzer/components/BatchAnalyzerTab';
+import { LocalModeTab } from './features/local-mode/components/LocalModeTab';
 
 interface CalculationResult {
   totalEGP: number;
@@ -36,7 +37,7 @@ export default function App() {
   const [result, setResult] = useState<CalculationResult | null>(null);
   // إضافة حالة لتخزين البيانات المستوردة
   const [importedData, setImportedData] = useState<ImportedRow[]>([]);
-  const [activeTab, setActiveTab] = useState<'calculator' | 'binance' | 'average-price' | 'batch-analyzer'>('calculator');
+  const [activeTab, setActiveTab] = useState<'calculator' | 'binance' | 'average-price' | 'batch-analyzer' | 'local-mode'>('calculator');
 
   const calculateResults = () => {
     // التحقق من وجود مبالغ مدخلة فقط
@@ -267,33 +268,27 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-8">
-      <div className="relative mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 mb-3">
-            نظام E-Voucher للتحويلات المالية
-          </h1>
-          <div className="max-w-3xl mx-auto">
-            <p className="text-xl text-gray-600 leading-relaxed mb-4">
-              منصة متكاملة لإدارة التحويلات المالية وتداول العملات الرقمية
-            </p>
+    <div className="bg-gradient-to-br from-blue-50 to-violet-50 min-h-screen pb-16">
+      <div className="container mx-auto px-4 py-8">
+        <div className="pb-6">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4">آلة حاسبة لتحويل العملات</h1>
+            <p className="text-gray-600 max-w-2xl mx-auto">أداة مساعدة لحساب وتحليل عمليات تحويل العملات وتقدير الأرباح</p>
           </div>
-        </div>
-        
-        <div className="mb-8">
+
           <div className="border-b border-gray-200">
-            <nav className="flex justify-center -mb-px space-x-8 rtl:space-x-reverse">
+            <nav className="flex flex-wrap justify-center -mb-px space-x-4 sm:space-x-8">
               <button
                 onClick={() => setActiveTab('calculator')}
                 className={`border-b-2 ${activeTab === 'calculator' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
               >
-                حساب الأرباح من التحويلات بين الدول
+                الصفحة الرئيسية
               </button>
               <button
                 onClick={() => setActiveTab('binance')}
                 className={`border-b-2 ${activeTab === 'binance' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
               >
-                Binance
+                بينانس P2P
               </button>
               <button
                 onClick={() => setActiveTab('average-price')}
@@ -306,6 +301,12 @@ export default function App() {
                 className={`border-b-2 ${activeTab === 'batch-analyzer' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
               >
                 تحليل ملفات متعددة
+              </button>
+              <button
+                onClick={() => setActiveTab('local-mode')}
+                className={`border-b-2 ${activeTab === 'local-mode' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
+              >
+                الوضع المحلي
               </button>
             </nav>
           </div>
@@ -512,6 +513,8 @@ export default function App() {
           <BinanceTab />
         ) : activeTab === 'average-price' ? (
           <AveragePriceTab />
+        ) : activeTab === 'local-mode' ? (
+          <LocalModeTab />
         ) : (
           <BatchAnalyzerTab />
         )}

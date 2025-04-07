@@ -544,12 +544,12 @@ export const BatchAnalyzerTab: React.FC = () => {
       }
       return null;
     };
-
+    
     return (
       <div className="space-y-6">
         {/* الرسم البياني الرئيسي */}
         <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <h4 className="text-sm font-semibold mb-3 text-right">تطور متوسط السعر الشهري</h4>
+        <h4 className="text-sm font-semibold mb-3 text-right">تطور متوسط السعر الشهري</h4>
           <div className="h-[400px] mt-2">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData}>
@@ -621,8 +621,8 @@ export const BatchAnalyzerTab: React.FC = () => {
                 />
               </ComposedChart>
             </ResponsiveContainer>
-          </div>
-        </div>
+                    </div>
+                  </div>
 
         {/* رسم بياني للتغيرات */}
         <div className="bg-white p-4 rounded-lg border border-gray-200">
@@ -886,12 +886,12 @@ export const BatchAnalyzerTab: React.FC = () => {
         <div className="mt-8">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-2">
-              <button
+            <button
                 onClick={toggleAllMonths}
-                className="text-xs px-3 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition"
-              >
-                {showAllDetails ? 'طي الكل' : 'عرض الكل'}
-              </button>
+              className="text-xs px-3 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition"
+            >
+              {showAllDetails ? 'طي الكل' : 'عرض الكل'}
+            </button>
               <button
                 onClick={() => {
                   const allFileIds = new Set(selectedFiles.map(file => file.name));
@@ -932,8 +932,8 @@ export const BatchAnalyzerTab: React.FC = () => {
               return (
                 <div key={month} className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
                   {/* رأس الشهر */}
-                  <div
-                    className="flex justify-between items-center p-3 cursor-pointer hover:bg-gray-100 transition"
+                <div
+                  className="flex justify-between items-center p-3 cursor-pointer hover:bg-gray-100 transition"
                     onClick={() => toggleMonth(month)}
                   >
                     <div className="flex items-center gap-2">
@@ -948,34 +948,34 @@ export const BatchAnalyzerTab: React.FC = () => {
                       />
                       <svg
                         className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${expandedMonths.has(month) ? 'transform rotate-90' : ''}`}
-                        fill="none"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path d="M9 5l7 7-7 7"></path>
-                      </svg>
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path d="M9 5l7 7-7 7"></path>
+                    </svg>
                       <span className="text-sm text-gray-500">{monthFiles.length} ملف</span>
                     </div>
                     <h4 className="font-semibold text-right">{month}</h4>
-                  </div>
-                  
+                </div>
+                
                   {/* تفاصيل الشهر */}
                   {expandedMonths.has(month) && (
-                    <div className="p-3 border-t border-gray-200">
+                  <div className="p-3 border-t border-gray-200">
                       <div className="grid grid-cols-3 gap-2 mb-4">
-                        <div className="bg-white p-2 rounded border border-gray-200">
-                          <div className="text-xs text-gray-500 text-right">المبلغ بالجنيه</div>
+                      <div className="bg-white p-2 rounded border border-gray-200">
+                        <div className="text-xs text-gray-500 text-right">المبلغ بالجنيه</div>
                           <div className="text-sm font-bold text-right">{data.totalAmount.toFixed(4)}</div>
-                        </div>
-                        <div className="bg-white p-2 rounded border border-gray-200">
-                          <div className="text-xs text-gray-500 text-right">كمية USDT</div>
+                      </div>
+                      <div className="bg-white p-2 rounded border border-gray-200">
+                        <div className="text-xs text-gray-500 text-right">كمية USDT</div>
                           <div className="text-sm font-bold text-right">{data.totalUsdt.toFixed(4)}</div>
-                        </div>
-                        <div className="bg-white p-2 rounded border border-gray-200">
-                          <div className="text-xs text-gray-500 text-right">متوسط السعر</div>
+                      </div>
+                      <div className="bg-white p-2 rounded border border-gray-200">
+                        <div className="text-xs text-gray-500 text-right">متوسط السعر</div>
                           <div className="text-sm font-bold text-right">{data.averagePrice.toFixed(4)}</div>
                         </div>
                       </div>
@@ -1003,10 +1003,10 @@ export const BatchAnalyzerTab: React.FC = () => {
                             </div>
                           </div>
                         ))}
-                      </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
               );
             })}
           </div>
