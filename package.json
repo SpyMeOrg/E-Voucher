@@ -10,6 +10,7 @@
     "dev": "vite",
     "dev:frontend": "vite",
     "dev:backend": "netlify functions:serve",
+    "dev:local": "node src/features/local-mode/server.js",
     "build": "tsc && vite build",
     "build:functions": "tsc -p netlify/functions/tsconfig.json",
     "preview": "vite preview"
@@ -53,5 +54,16 @@
   "browser": {
     "crypto": "crypto-browserify",
     "stream": "stream-browserify"
+  },
+  "localServer": {
+    "version": "1.0.0",
+    "description": "خادم محلي لتجاوز قيود API بينانس",
+    "main": "server.js",
+    "dependencies": {
+      "express": "^4.18.2",
+      "cors": "^2.8.5",
+      "node-fetch": "^2.6.9",
+      "crypto": "^1.0.1"
+    }
   }
 }

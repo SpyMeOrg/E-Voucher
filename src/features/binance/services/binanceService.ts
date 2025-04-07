@@ -20,15 +20,40 @@ export class BinanceService {
     private recvWindow = 60000;
     private maxRetries = 3;
     private retryDelay = 1000;
-    private baseUrl: string;
+    private baseUrl: string = '';
+    private useLocalServer: boolean;
 
     constructor(apiKey: string, secretKey: string) {
         this.apiKey = apiKey;
         this.secretKey = secretKey;
+        this.useLocalServer = localStorage.getItem('localModeActive') === 'true';
+        
+        // الاستماع لتغييرات الوضع المحلي
+        window.addEventListener('localModeChanged', ((event: CustomEvent) => {
+            this.useLocalServer = event.detail.active;
+            console.log('Local mode changed:', this.useLocalServer);
+        }) as EventListener);
+        
         // تحديث العنوان بناءً على بيئة التشغيل
-        this.baseUrl = window.location.hostname === 'localhost' 
-            ? 'http://localhost:3001/.netlify/functions/binanceApi'
-            : `${window.location.origin}/.netlify/functions/binanceApi`;
+        this.updateBaseUrl();
+    }
+    
+    private updateBaseUrl() {
+        const isLocalhost = window.location.hostname === 'localhost';
+        
+        if (this.useLocalServer) {
+            // استخدام الخادم المحلي على البورت 3001
+            this.baseUrl = 'http://localhost:3001/.netlify/functions/binanceApi';
+            console.log('Using local server:', this.baseUrl);
+        } else if (isLocalhost) {
+            // بيئة تطوير محلية
+            this.baseUrl = 'http://localhost:3000/.netlify/functions/binanceApi';
+            console.log('Using development server:', this.baseUrl);
+        } else {
+            // الخادم الإنتاجي
+            this.baseUrl = `${window.location.origin}/.netlify/functions/binanceApi`;
+            console.log('Using production server:', this.baseUrl);
+        }
     }
 
     private async retryRequest<T>(requestFn: () => Promise<T>): Promise<T> {
@@ -54,6 +79,9 @@ export class BinanceService {
     }
 
     private async makeRequest(endpoint: string, params: Record<string, string> = {}) {
+        // تحديث عنوان الخادم قبل كل طلب
+        this.updateBaseUrl();
+        
         const response = await fetch(this.baseUrl, {
             method: 'POST',
             headers: {
@@ -74,6 +102,12 @@ export class BinanceService {
         if (!response.ok) {
             const text = await response.text();
             console.error('API Error Response:', text);
+            
+            // إذا كان الخطأ 451 وليس في الوضع المحلي، اقترح استخدام الوضع المحلي
+            if (response.status === 451 && !this.useLocalServer) {
+                throw new Error(`خطأ في الاتصال: ${response.status} - يرجى تفعيل الوضع المحلي لتجاوز هذا القيد`);
+            }
+            
             throw new Error(`خطأ في الاتصال: ${response.status}`);
         }
 
