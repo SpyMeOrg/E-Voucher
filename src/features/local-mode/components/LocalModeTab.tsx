@@ -1,71 +1,136 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export const LocalModeTab: React.FC = () => {
   const [isLocalModeActive, setIsLocalModeActive] = useState<boolean>(() => {
     return localStorage.getItem('localModeActive') === 'true';
   });
   const [backendStatus, setBackendStatus] = useState<'running' | 'stopped' | 'unknown'>('unknown');
-
-  // التحقق من حالة الخادم المحلي عند تحميل المكون
-  useEffect(() => {
-    checkBackendStatus();
-    const interval = setInterval(checkBackendStatus, 5000); // التحقق كل 5 ثوانٍ
-    return () => clearInterval(interval);
-  }, []);
+  const [serverLog, setServerLog] = useState<string[]>([]);
+  const wsServerRef = useRef<WebSocket | null>(null);
+  const wsClientRef = useRef<WebSocket | null>(null);
 
   // حفظ حالة الوضع المحلي
   useEffect(() => {
     localStorage.setItem('localModeActive', isLocalModeActive.toString());
   }, [isLocalModeActive]);
 
-  // التحقق من حالة الخادم الخلفي
-  const checkBackendStatus = async () => {
+  // إضافة رسالة إلى سجل الخادم
+  const addLog = (message: string) => {
+    setServerLog(prev => [...prev, `${new Date().toLocaleTimeString()} - ${message}`]);
+  };
+
+  // إنشاء خادم WebSocket بسيط
+  const createLocalServer = () => {
     try {
-      const response = await fetch('http://localhost:5000/api/status', {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(2000) // وضع مهلة زمنية للطلب
-      });
+      // إنشاء خادم WebSocket بسيط
+      const server = new WebSocket('ws://localhost:5000/ws');
       
-      if (response.ok) {
+      server.onopen = () => {
+        addLog('تم إنشاء الخادم المحلي بنجاح');
         setBackendStatus('running');
-      } else {
+      };
+      
+      server.onmessage = (event) => {
+        addLog(`تم استلام رسالة: ${event.data}`);
+        // معالجة الرسائل الواردة
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'ping') {
+            server.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+          }
+        } catch (error) {
+          console.error('خطأ في معالجة الرسالة:', error);
+        }
+      };
+      
+      server.onclose = () => {
+        addLog('تم إغلاق الخادم المحلي');
         setBackendStatus('stopped');
-      }
+      };
+      
+      server.onerror = (error) => {
+        addLog(`خطأ في الخادم المحلي: ${error}`);
+        setBackendStatus('stopped');
+      };
+      
+      wsServerRef.current = server;
     } catch (error) {
-      setBackendStatus('stopped');
+      console.error('فشل إنشاء الخادم المحلي:', error);
+      addLog(`فشل إنشاء الخادم المحلي: ${error}`);
     }
   };
 
   // تشغيل الخادم المحلي
   const startLocalServer = () => {
     try {
-      // استخدام WebSocket بدلاً من البروتوكول المخصص
-      const ws = new WebSocket('ws://localhost:5000/ws');
+      addLog('جاري تشغيل الخادم المحلي...');
       
-      ws.onopen = () => {
-        console.log('تم الاتصال بالخادم المحلي');
+      // إنشاء اتصال WebSocket للعميل
+      const client = new WebSocket('ws://localhost:5000/ws');
+      
+      client.onopen = () => {
+        addLog('تم الاتصال بالخادم المحلي');
         setBackendStatus('running');
+        
+        // إرسال رسالة ping للتحقق من عمل الخادم
+        client.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
       };
       
-      ws.onclose = () => {
-        console.log('تم إغلاق الاتصال بالخادم المحلي');
+      client.onmessage = (event) => {
+        addLog(`تم استلام رد: ${event.data}`);
+      };
+      
+      client.onclose = () => {
+        addLog('تم إغلاق الاتصال بالخادم المحلي');
         setBackendStatus('stopped');
       };
       
-      ws.onerror = (error) => {
-        console.error('خطأ في الاتصال بالخادم المحلي:', error);
+      client.onerror = (error) => {
+        addLog(`خطأ في الاتصال بالخادم المحلي: ${error}`);
         setBackendStatus('stopped');
       };
+      
+      wsClientRef.current = client;
+      
+      // إنشاء الخادم المحلي
+      createLocalServer();
     } catch (error) {
       console.error('فشل تشغيل الخادم المحلي:', error);
+      addLog(`فشل تشغيل الخادم المحلي: ${error}`);
     }
   };
 
   // تغيير حالة الوضع المحلي
   const toggleLocalMode = (e: React.ChangeEvent<HTMLInputElement>) => {
     setIsLocalModeActive(e.target.checked);
+    if (e.target.checked) {
+      startLocalServer();
+    } else {
+      // إغلاق الاتصالات عند تعطيل الوضع المحلي
+      if (wsServerRef.current) {
+        wsServerRef.current.close();
+        wsServerRef.current = null;
+      }
+      if (wsClientRef.current) {
+        wsClientRef.current.close();
+        wsClientRef.current = null;
+      }
+      setBackendStatus('stopped');
+      addLog('تم تعطيل الوضع المحلي');
+    }
   };
+
+  // تنظيف الاتصالات عند إزالة المكون
+  useEffect(() => {
+    return () => {
+      if (wsServerRef.current) {
+        wsServerRef.current.close();
+      }
+      if (wsClientRef.current) {
+        wsClientRef.current.close();
+      }
+    };
+  }, []);
 
   return (
     <div className="relative bg-white backdrop-blur-sm bg-opacity-90 shadow-2xl rounded-2xl p-4 sm:p-8 lg:p-12 mx-auto border border-gray-100 mb-8">
@@ -107,7 +172,7 @@ export const LocalModeTab: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <p className="text-gray-500 text-sm">
               تشغيل الخادم المحلي يتيح لك استخدام تبويب بينانس بدون تعارضات مع نتليفاي
             </p>
@@ -126,6 +191,26 @@ export const LocalModeTab: React.FC = () => {
                 </label>
               </div>
             </div>
+          </div>
+          
+          {/* سجل الخادم */}
+          <div className="mt-4 bg-gray-800 text-gray-200 p-4 rounded-lg font-mono text-sm h-40 overflow-y-auto">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-gray-400">سجل الخادم</span>
+              <button 
+                onClick={() => setServerLog([])}
+                className="text-xs text-gray-400 hover:text-white"
+              >
+                مسح السجل
+              </button>
+            </div>
+            {serverLog.length === 0 ? (
+              <div className="text-gray-500 text-center py-4">لا توجد سجلات حتى الآن</div>
+            ) : (
+              serverLog.map((log, index) => (
+                <div key={index} className="mb-1">{log}</div>
+              ))
+            )}
           </div>
         </div>
         
