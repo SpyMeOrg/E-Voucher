@@ -328,6 +328,7 @@ export const BinanceTab: React.FC = () => {
             '#': index + 1,
             'ID': order.orderId,
             'Type': order.type === 'BUY' ? 'Buy' : 'Sell',
+            'Currency': order.fiatCurrency || 'EGP',
             'EGP': { v: order.fiatAmount, t: 'n', z: '#,##0.00' },
             'Usdt B': { v: order.cryptoAmount, t: 'n', z: '#,##0.00' },
             'USDT': { 
@@ -358,6 +359,7 @@ export const BinanceTab: React.FC = () => {
             '#': exportData.length + 1,
             'ID': 'Total',
             'Type': '',
+            'Currency': '',
             'EGP': { v: totalEGP, t: 'n', z: '#,##0.00' },
             'Usdt B': { v: totalUsdtB, t: 'n', z: '#,##0.00' },
             'USDT': { v: totalUSDT, t: 'n', z: '#,##0.00' },
@@ -369,21 +371,22 @@ export const BinanceTab: React.FC = () => {
 
         // إنشاء ورقة عمل جديدة
         const worksheet = XLSX.utils.json_to_sheet(exportData, {
-            header: ['#', 'ID', 'Type', 'EGP', 'Usdt B', 'USDT', 'Price', 'Fees', 'Status', 'Date']
+            header: ['#', 'ID', 'Type', 'Currency', 'EGP', 'Usdt B', 'USDT', 'Price', 'Fees', 'Status', 'Date']
         });
 
         // تعديل عرض الأعمدة
         const columnWidths = [
-            { wch: 5 },  // #
-            { wch: 15 }, // ID
-            { wch: 8 },  // Type
-            { wch: 12 }, // EGP
-            { wch: 10 }, // Usdt B
-            { wch: 10 }, // USDT
-            { wch: 10 }, // Price
-            { wch: 8 },  // Fees
-            { wch: 12 }, // Status
-            { wch: 20 }  // Date
+            { wch: 5 },   // #
+            { wch: 15 },  // ID
+            { wch: 8 },   // Type
+            { wch: 10 },  // Currency
+            { wch: 12 },  // EGP
+            { wch: 10 },  // Usdt B
+            { wch: 10 },  // USDT
+            { wch: 10 },  // Price
+            { wch: 8 },   // Fees
+            { wch: 12 },  // Status
+            { wch: 20 }   // Date
         ];
         worksheet['!cols'] = columnWidths;
 
@@ -767,6 +770,7 @@ export const BinanceTab: React.FC = () => {
                                 <th className="p-4 text-Center">#</th>
                                 <th className="p-4 text-Center">ID</th>
                                 <th className="p-4 text-Center">Type</th>
+                                <th className="p-4 text-Center">Currency</th>
                                 <th className="p-4 text-Center">EGP</th>
                                 <th className="p-4 text-Center">Usdt B</th>
                                 <th className="p-4 text-Center">USDT</th>
@@ -802,6 +806,7 @@ export const BinanceTab: React.FC = () => {
                                             {order.type === 'BUY' ? 'Buy' : 'Sell'}
                                         </span>
                                     </td>
+                                    <td className="p-4">{order.fiatCurrency || 'EGP'}</td>
                                     <td className="p-4">{order.fiatAmount.toFixed(2)}</td>
                                     <td className="p-4">{order.cryptoAmount.toFixed(2)}</td>
                                     <td className="p-4 font-bold">
