@@ -843,6 +843,38 @@ export const BinanceTab: React.FC = () => {
                                 </tr>
                             ))}
                         </tbody>
+                        <tfoot className="bg-gray-200 font-bold">
+                            <tr>
+                                <td colSpan={2} className="p-4 text-right">الإجماليات</td>
+                                <td className="p-4">-</td>
+                                <td className="p-4">-</td>
+                                <td className="p-4">{filteredOrders.reduce((sum, order) => sum + order.fiatAmount, 0).toFixed(2)}</td>
+                                <td className="p-4">{filteredOrders.reduce((sum, order) => sum + order.cryptoAmount, 0).toFixed(2)}</td>
+                                <td className="p-4">{filteredOrders.reduce((sum, order) => {
+                                    if (order.fee === 0) {
+                                        return sum + (order.type === 'BUY' ? 
+                                            (order.cryptoAmount - 0.05) : 
+                                            (order.cryptoAmount + 0.05));
+                                    }
+                                    return sum + order.actualUsdt;
+                                }, 0).toFixed(2)}</td>
+                                <td className="p-4">{(() => {
+                                    const totalEGP = filteredOrders.reduce((sum, order) => sum + order.fiatAmount, 0);
+                                    const totalUSDT = filteredOrders.reduce((sum, order) => {
+                                        if (order.fee === 0) {
+                                            return sum + (order.type === 'BUY' ? 
+                                                (order.cryptoAmount - 0.05) : 
+                                                (order.cryptoAmount + 0.05));
+                                        }
+                                        return sum + order.actualUsdt;
+                                    }, 0);
+                                    return totalUSDT > 0 ? (totalEGP / totalUSDT).toFixed(3) : '0.000';
+                                })()}</td>
+                                <td className="p-4">{filteredOrders.reduce((sum, order) => sum + (order.fee === 0 ? 0.05 : order.fee), 0).toFixed(2)}</td>
+                                <td className="p-4">-</td>
+                                <td className="p-4">-</td>
+                            </tr>
+                        </tfoot>
                     </table>
                     
                     {/* زر تحميل المزيد من البيانات */}
