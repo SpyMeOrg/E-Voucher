@@ -324,35 +324,63 @@ export const BinanceTab: React.FC = () => {
         const averagePrice = totalUSDT > 0 ? totalEGP / totalUSDT : 0;
 
         // إنشاء مصفوفة من البيانات المراد تصديرها
-        const exportData = filteredOrders.map((order, index) => ({
-            '#': index + 1,
-            'ID': order.orderId,
-            'Type': order.type === 'BUY' ? 'Buy' : 'Sell',
-            'Currency': order.fiatCurrency || 'EGP',
-            'EGP': { v: order.fiatAmount, t: 'n', z: '#,##0.00' },
-            'Usdt B': { v: order.cryptoAmount, t: 'n', z: '#,##0.00' },
-            'USDT': { 
-                v: order.fee === 0 ? 
-                    (order.type === 'BUY' ? 
-                        (order.cryptoAmount - 0.05) : 
-                        (order.cryptoAmount + 0.05)) : 
-                    order.actualUsdt,
-                t: 'n',
-                z: '#,##0.00'
-            },
-            'Price': { 
-                v: order.fee === 0 ? 
-                    (order.type === 'BUY' ? 
-                        (order.fiatAmount / (order.cryptoAmount - 0.05)) : 
-                        (order.fiatAmount / (order.cryptoAmount + 0.05))) : 
-                    (order.fiatAmount / order.actualUsdt),
-                t: 'n',
-                z: '#,##0.000'
-            },
-            'Fees': { v: order.fee === 0 ? 0.05 : order.fee, t: 'n', z: '#,##0.00' },
-            'Status': order.status,
-            'Date': new Date(order.createTime).toLocaleString('en-GB', { hour12: false })
-        }));
+        const exportData = filteredOrders.map((order, index) => {
+            // حساب المبلغ الحقيقي مع رسوم البنك
+            let realAmount = order.fiatAmount;
+            if (order.type === 'BUY') {
+                if (order.fiatCurrency === 'AED') {
+                    realAmount += 0.5; // رسوم البنك للدرهم
+                } else if (order.fiatCurrency === 'EGP') {
+                    const bankFee = Math.min(Math.max(order.fiatAmount * 0.0015, 10), 50); // 0.15% بحد أدنى 10 وأقصى 50
+                    realAmount += bankFee;
+                }
+            }
+
+            return {
+                '#': index + 1,
+                'ID': order.orderId,
+                'Type': order.type === 'BUY' ? 'Buy' : 'Sell',
+                'Currency': order.fiatCurrency || 'EGP',
+                'EGP': { v: order.fiatAmount, t: 'n', z: '#,##0.00' },
+                'Real Amount': { v: realAmount, t: 'n', z: '#,##0.00' },
+                'Usdt B': { v: order.cryptoAmount, t: 'n', z: '#,##0.00' },
+                'USDT': { 
+                    v: order.fee === 0 ? 
+                        (order.type === 'BUY' ? 
+                            (order.cryptoAmount - 0.05) : 
+                            (order.cryptoAmount + 0.05)) : 
+                        order.actualUsdt,
+                    t: 'n',
+                    z: '#,##0.00'
+                },
+                'Price': { 
+                    v: order.fee === 0 ? 
+                        (order.type === 'BUY' ? 
+                            (order.fiatAmount / (order.cryptoAmount - 0.05)) : 
+                            (order.fiatAmount / (order.cryptoAmount + 0.05))) : 
+                        (order.fiatAmount / order.actualUsdt),
+                    t: 'n',
+                    z: '#,##0.000'
+                },
+                'Fees': { v: order.fee === 0 ? 0.05 : order.fee, t: 'n', z: '#,##0.00' },
+                'Status': order.status,
+                'Date': new Date(order.createTime).toLocaleString('en-GB', { hour12: false })
+            };
+        });
+
+        // حساب إجمالي المبلغ الحقيقي للأوردرات
+        const totalRealAmount = filteredOrders.reduce((sum, order) => {
+            let realAmount = order.fiatAmount;
+            if (order.type === 'BUY') {
+                if (order.fiatCurrency === 'AED') {
+                    realAmount += 0.5;
+                } else if (order.fiatCurrency === 'EGP') {
+                    const bankFee = Math.min(Math.max(order.fiatAmount * 0.0015, 10), 50);
+                    realAmount += bankFee;
+                }
+            }
+            return sum + realAmount;
+        }, 0);
 
         // إضافة صف المجاميع
         exportData.push({
@@ -361,6 +389,7 @@ export const BinanceTab: React.FC = () => {
             'Type': '',
             'Currency': '',
             'EGP': { v: totalEGP, t: 'n', z: '#,##0.00' },
+            'Real Amount': { v: totalRealAmount, t: 'n', z: '#,##0.00' },
             'Usdt B': { v: totalUsdtB, t: 'n', z: '#,##0.00' },
             'USDT': { v: totalUSDT, t: 'n', z: '#,##0.00' },
             'Price': { v: averagePrice, t: 'n', z: '#,##0.000' },
@@ -371,7 +400,7 @@ export const BinanceTab: React.FC = () => {
 
         // إنشاء ورقة عمل جديدة
         const worksheet = XLSX.utils.json_to_sheet(exportData, {
-            header: ['#', 'ID', 'Type', 'Currency', 'EGP', 'Usdt B', 'USDT', 'Price', 'Fees', 'Status', 'Date']
+            header: ['#', 'ID', 'Type', 'Currency', 'EGP', 'Real Amount', 'Usdt B', 'USDT', 'Price', 'Fees', 'Status', 'Date']
         });
 
         // تعديل عرض الأعمدة
@@ -381,6 +410,7 @@ export const BinanceTab: React.FC = () => {
             { wch: 8 },   // Type
             { wch: 10 },  // Currency
             { wch: 12 },  // EGP
+            { wch: 15 },  // Real Amount
             { wch: 10 },  // Usdt B
             { wch: 10 },  // USDT
             { wch: 10 },  // Price
@@ -772,6 +802,7 @@ export const BinanceTab: React.FC = () => {
                                 <th className="p-4 text-Center">Type</th>
                                 <th className="p-4 text-Center">Currency</th>
                                 <th className="p-4 text-Center">EGP</th>
+                                <th className="p-4 text-Center">Real Amount</th>
                                 <th className="p-4 text-Center">Usdt B</th>
                                 <th className="p-4 text-Center">USDT</th>
                                 <th className="p-4 text-Center">Price</th>
