@@ -354,11 +354,28 @@ export const BinanceTab: React.FC = () => {
                     z: '#,##0.00'
                 },
                 'Price': { 
-                    v: order.fee === 0 ? 
-                        (order.type === 'BUY' ? 
-                            (order.fiatAmount / (order.cryptoAmount - 0.05)) : 
-                            (order.fiatAmount / (order.cryptoAmount + 0.05))) : 
-                        (order.fiatAmount / order.actualUsdt),
+                    v: (() => {
+                        // حساب المبلغ الحقيقي
+                        let realAmount = order.fiatAmount;
+                        if (order.type === 'BUY') {
+                            if (order.fiatCurrency === 'AED') {
+                                realAmount += 0.5;
+                            } else if (order.fiatCurrency === 'EGP') {
+                                const bankFee = Math.min(Math.max(order.fiatAmount * 0.0015, 10), 50);
+                                realAmount += bankFee;
+                            }
+                        }
+                        
+                        // حساب USDT الفعلي
+                        const actualUSDT = order.fee === 0 ? 
+                            (order.type === 'BUY' ? 
+                                (order.cryptoAmount - 0.05) : 
+                                (order.cryptoAmount + 0.05)) : 
+                            order.actualUsdt;
+                        
+                        // حساب السعر: المبلغ الحقيقي / USDT الفعلي
+                        return realAmount / actualUSDT;
+                    })(),
                     t: 'n',
                     z: '#,##0.000'
                 },
@@ -839,6 +856,18 @@ export const BinanceTab: React.FC = () => {
                                     </td>
                                     <td className="p-4">{order.fiatCurrency || 'EGP'}</td>
                                     <td className="p-4">{order.fiatAmount.toFixed(2)}</td>
+                                    <td className="p-4">{(() => {
+                                        let realAmount = order.fiatAmount;
+                                        if (order.type === 'BUY') {
+                                            if (order.fiatCurrency === 'AED') {
+                                                realAmount += 0.5; // رسوم البنك للدرهم
+                                            } else if (order.fiatCurrency === 'EGP') {
+                                                const bankFee = Math.min(Math.max(order.fiatAmount * 0.0015, 10), 50); // 0.15% بحد أدنى 10 وأقصى 50
+                                                realAmount += bankFee;
+                                            }
+                                        }
+                                        return realAmount.toFixed(2);
+                                    })()}</td>
                                     <td className="p-4">{order.cryptoAmount.toFixed(2)}</td>
                                     <td className="p-4 font-bold">
                                         {order.fee === 0 ? 
@@ -848,14 +877,28 @@ export const BinanceTab: React.FC = () => {
                                             order.actualUsdt.toFixed(2)
                                         }
                                     </td>
-                                    <td className="p-4">
-                                        {order.fee === 0 ? 
-                                            (order.type === 'BUY' ? 
-                                                (order.fiatAmount / (order.cryptoAmount - 0.05)).toFixed(3) : 
-                                                (order.fiatAmount / (order.cryptoAmount + 0.05)).toFixed(3)) : 
-                                            (order.fiatAmount / order.actualUsdt).toFixed(3)
+                                    <td className="p-4">{(() => {
+                                        // حساب المبلغ الحقيقي
+                                        let realAmount = order.fiatAmount;
+                                        if (order.type === 'BUY') {
+                                            if (order.fiatCurrency === 'AED') {
+                                                realAmount += 0.5;
+                                            } else if (order.fiatCurrency === 'EGP') {
+                                                const bankFee = Math.min(Math.max(order.fiatAmount * 0.0015, 10), 50);
+                                                realAmount += bankFee;
+                                            }
                                         }
-                                    </td>
+                                        
+                                        // حساب USDT الفعلي
+                                        const actualUSDT = order.fee === 0 ? 
+                                            (order.type === 'BUY' ? 
+                                                (order.cryptoAmount - 0.05) : 
+                                                (order.cryptoAmount + 0.05)) : 
+                                            order.actualUsdt;
+                                        
+                                        // حساب السعر: المبلغ الحقيقي / USDT الفعلي
+                                        return (realAmount / actualUSDT).toFixed(3);
+                                    })()}</td>
                                     <td className="p-4">
                                         {order.fee === 0 ? `0.05 🔄` : order.fee.toFixed(2)}
                                     </td>
