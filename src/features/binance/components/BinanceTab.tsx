@@ -923,6 +923,24 @@ export const BinanceTab: React.FC = () => {
                                 <td className="p-4">-</td>
                                 <td className="p-4">-</td>
                                 <td className="p-4">{filteredOrders.reduce((sum, order) => sum + order.fiatAmount, 0).toFixed(2)}</td>
+                                <td className="p-4">
+                                    {(() => {
+                                        // حساب إجمالي المبلغ الحقيقي للأوردرات
+                                        const totalRealAmount = filteredOrders.reduce((sum, order) => {
+                                            let realAmount = order.fiatAmount;
+                                            if (order.type === 'BUY') {
+                                                if (order.fiatCurrency === 'AED') {
+                                                    realAmount += 0.5;
+                                                } else if (order.fiatCurrency === 'EGP') {
+                                                    const bankFee = Math.min(Math.max(order.fiatAmount * 0.0015, 10), 50);
+                                                    realAmount += bankFee;
+                                                }
+                                            }
+                                            return sum + realAmount;
+                                        }, 0);
+                                        return totalRealAmount.toFixed(2);
+                                    })()}
+                                </td>
                                 <td className="p-4">{filteredOrders.reduce((sum, order) => sum + order.cryptoAmount, 0).toFixed(2)}</td>
                                 <td className="p-4">{filteredOrders.reduce((sum, order) => {
                                     if (order.fee === 0) {
