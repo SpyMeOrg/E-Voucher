@@ -323,8 +323,11 @@ export const BinanceTab: React.FC = () => {
         const totalFees = filteredOrders.reduce((sum, order) => sum + (order.fee === 0 ? 0.05 : order.fee), 0);
         const averagePrice = totalUSDT > 0 ? totalEGP / totalUSDT : 0;
 
+        // ترتيب البيانات حسب التاريخ من الأقدم للأحدث
+        const sortedOrders = [...filteredOrders].sort((a, b) => a.createTime - b.createTime);
+
         // إنشاء مصفوفة من البيانات المراد تصديرها
-        const exportData = filteredOrders.map((order, index) => {
+        const exportData = sortedOrders.map((order, index) => {
             // حساب المبلغ الحقيقي مع رسوم البنك
             let realAmount = order.fiatAmount;
             if (order.type === 'BUY') {
@@ -950,6 +953,7 @@ export const BinanceTab: React.FC = () => {
                                     }
                                     return sum + order.actualUsdt;
                                 }, 0).toFixed(2)}</td>
+                                <td className="p-4">{filteredOrders.reduce((sum, order) => sum + (order.fee === 0 ? 0.05 : order.fee), 0).toFixed(2)}</td>
                                 <td className="p-4">{(() => {
                                     // حساب إجمالي المبلغ الحقيقي
                                     const totalRealAmount = filteredOrders.reduce((sum, order) => {
