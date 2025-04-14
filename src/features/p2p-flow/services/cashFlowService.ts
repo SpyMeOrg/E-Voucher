@@ -180,8 +180,6 @@ export const createCashFlowRecords = (
       currencyCostInfo.acquiredAmount += transaction.realAmount;
       
       // تحديث التكلفة الإجمالية للعملة المحلية بناءً على البيع الجديد
-      // نستخدم متوسط سعر التكلفة الحالي لليوزد
-      const usdtCostRate = updatedCostInfo['USDT']?.weightedAvgRate || transaction.price;
       
       currencyCostInfo.totalCostInBase = (currencyCostInfo.initialAmount * currencyCostInfo.initialRate) +
                                        (currencyCostInfo.acquiredAmount * transaction.price);
