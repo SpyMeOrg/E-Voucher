@@ -1,15 +1,5 @@
 import { read, utils, WorkBook } from 'xlsx';
-import { P2PTransaction, CashFlowRecord, TransactionSummary } from '../types/types';
-
-// تعريف نوع CurrencyCostInfo
-interface CurrencyCostInfo {
-  totalAmount: number;
-  totalCostInBase: number;
-  weightedAvgRate: number;
-  initialAmount: number;
-  initialRate: number;
-  acquiredAmount: number;
-}
+import { P2PTransaction, CashFlowRecord, TransactionSummary, CurrencyCostInfo } from '../types/types';
 
 // استيراد ملف Excel وتحويله إلى مصفوفة عمليات
 export const importExcelFile = async (file: File): Promise<P2PTransaction[]> => {
