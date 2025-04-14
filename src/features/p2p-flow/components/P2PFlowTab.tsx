@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { utils, writeFile } from 'xlsx';
+import { writeFile } from 'xlsx';
 import { BankBalance, P2PTransaction, CashFlowRecord, TransactionSummary } from '../types/types';
 import { importExcelFile, createCashFlowRecords, calculateTransactionSummary, exportCashFlowToExcel } from '../services/cashFlowService';
 

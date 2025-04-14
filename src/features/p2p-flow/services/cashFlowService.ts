@@ -1,5 +1,15 @@
 import { read, utils, WorkBook } from 'xlsx';
-import { P2PTransaction, CashFlowRecord, TransactionSummary, BankBalance } from '../types/types';
+import { P2PTransaction, CashFlowRecord, TransactionSummary } from '../types/types';
+
+// تعريف نوع CurrencyCostInfo
+interface CurrencyCostInfo {
+  totalAmount: number;
+  totalCostInBase: number;
+  weightedAvgRate: number;
+  initialAmount: number;
+  initialRate: number;
+  acquiredAmount: number;
+}
 
 // استيراد ملف Excel وتحويله إلى مصفوفة عمليات
 export const importExcelFile = async (file: File): Promise<P2PTransaction[]> => {
@@ -153,7 +163,6 @@ export const createCashFlowRecords = (
       const usdtCostInfo = { ...updatedCostInfo['USDT'] };
       
       // القيم السابقة
-      const prevTotalAmount = usdtCostInfo.totalAmount;
       const prevTotalCost = usdtCostInfo.totalCostInBase;
       
       // القيم الجديدة
@@ -183,10 +192,9 @@ export const createCashFlowRecords = (
       // تحديث التكلفة الإجمالية للعملة المحلية بناءً على البيع الجديد
       // نستخدم متوسط سعر التكلفة الحالي لليوزد
       const usdtCostRate = updatedCostInfo['USDT']?.weightedAvgRate || transaction.price;
-      const newAcquisitionCost = transaction.usdt * usdtCostRate;
       
       currencyCostInfo.totalCostInBase = (currencyCostInfo.initialAmount * currencyCostInfo.initialRate) +
-                                        (currencyCostInfo.acquiredAmount * transaction.price);
+                                       (currencyCostInfo.acquiredAmount * transaction.price);
                                         
       if (currencyCostInfo.totalAmount > 0) {
         currencyCostInfo.weightedAvgRate = currencyCostInfo.totalCostInBase / currencyCostInfo.totalAmount;
@@ -207,7 +215,6 @@ export const createCashFlowRecords = (
                                       ((usdtCostInfo.totalAmount - usdtCostInfo.initialAmount) * usdtCostInfo.weightedAvgRate);
       } else {
         // إذا كانت الكمية المتبقية أقل من الكمية الأصلية، نقلل قيمة التكلفة الأصلية
-        const originalRatio = usdtCostInfo.totalAmount / usdtCostInfo.initialAmount;
         usdtCostInfo.initialAmount = usdtCostInfo.totalAmount;
         usdtCostInfo.totalCostInBase = usdtCostInfo.initialAmount * usdtCostInfo.initialRate;
       }
