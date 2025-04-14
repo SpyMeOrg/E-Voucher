@@ -5,6 +5,7 @@ import { BinanceTab } from './features/binance/components/BinanceTab';
 import { AveragePriceTab } from './features/average-price/components/AveragePriceTab';
 import { BatchAnalyzerTab } from './features/batch-analyzer/components/BatchAnalyzerTab';
 import { LocalModeTab } from './features/local-mode/components/LocalModeTab';
+import { P2PFlowTab } from './features/p2p-flow/components/P2PFlowTab';
 
 interface CalculationResult {
   totalEGP: number;
@@ -37,7 +38,7 @@ export default function App() {
   const [result, setResult] = useState<CalculationResult | null>(null);
   // إضافة حالة لتخزين البيانات المستوردة
   const [importedData, setImportedData] = useState<ImportedRow[]>([]);
-  const [activeTab, setActiveTab] = useState<'calculator' | 'binance' | 'average-price' | 'batch-analyzer' | 'local-mode'>('calculator');
+  const [activeTab, setActiveTab] = useState<'calculator' | 'binance' | 'average-price' | 'batch-analyzer' | 'local-mode' | 'p2p-flow'>('calculator');
 
   const calculateResults = () => {
     // التحقق من وجود مبالغ مدخلة فقط
@@ -308,6 +309,12 @@ export default function App() {
               >
                 الوضع المحلي
               </button>
+              <button
+                onClick={() => setActiveTab('p2p-flow')}
+                className={`border-b-2 ${activeTab === 'p2p-flow' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
+              >
+                سجل التدفق النقدي
+              </button>
             </nav>
           </div>
         </div>
@@ -515,6 +522,8 @@ export default function App() {
           <AveragePriceTab />
         ) : activeTab === 'local-mode' ? (
           <LocalModeTab />
+        ) : activeTab === 'p2p-flow' ? (
+          <P2PFlowTab />
         ) : (
           <BatchAnalyzerTab />
         )}
