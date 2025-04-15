@@ -23,34 +23,67 @@ export const importExcelFile = async (file: File): Promise<P2PTransaction[]> => 
         
         // البحث عن الحقول المطلوبة بطريقة أكثر مرونة
         const findField = (possibleNames: string[]): string => {
+          // تحويل مفاتيح الصف إلى مصفوفة
+          const rowKeys = Object.keys(row);
+          
+          // البحث عن اسم الحقل المطابق بغض النظر عن حالة الأحرف
           for (const name of possibleNames) {
+            // البحث المباشر بالاسم
             if (row[name] !== undefined) return name;
+            
+            // البحث بغض النظر عن حالة الأحرف
+            const matchingKey = rowKeys.find(key => 
+              key.toLowerCase() === name.toLowerCase() || 
+              key.toLowerCase().includes(name.toLowerCase())
+            );
+            
+            if (matchingKey) return matchingKey;
           }
+          
           return '';
         };
         
         // تحديد الحقول المطلوبة
         const typeField = findField(['Type', 'نوع', 'نوع العملية', 'النوع']);
         const currencyField = findField(['Currency', 'عملة', 'العملة']);
-        const amountField = findField(['Amount', 'المبلغ', 'مبلغ']);
-        const realAmountField = findField(['RealAmount', 'Real Amount', 'المبلغ الفعلي']);
-        const usdtField = findField(['USDT', 'يوزد', 'USDTAmount', 'USDT Amount']);
-        const dateField = findField(['Date', 'التاريخ', 'تاريخ', 'Created', 'Creation Date']);
-        const tradeTypeField = findField(['Trade Type', 'نوع التداول', 'TradeType']);
+        const amountField = findField(['Amount', 'المبلغ', 'مبلغ', 'قيمة']);
+        const realAmountField = findField(['RealAmount', 'Real Amount', 'المبلغ الفعلي', 'قيمة حقيقية']);
+        const usdtField = findField(['USDT', 'يوزد', 'USDTAmount', 'USDT Amount', 'مبلغ USDT']);
+        const dateField = findField(['Date', 'التاريخ', 'تاريخ', 'Created', 'Creation Date', 'وقت']);
+        const tradeTypeField = findField(['Trade Type', 'نوع التداول', 'TradeType', 'نوع المعاملة', 'نوع العملية']);
         const statusField = findField(['Status', 'الحالة', 'حالة']);
         
         console.log('Fields found:', {
           typeField, currencyField, amountField, realAmountField, usdtField, dateField, tradeTypeField, statusField
         });
         
-        const type = row[typeField] || '';
-        const currency = row[currencyField] || '';
-        const amount = parseFloat(row[amountField] || 0);
-        const realAmount = parseFloat(row[realAmountField] || row[amountField] || 0);
-        const usdt = parseFloat(row[usdtField] || 0);
-        const date = row[dateField] || '';
-        const tradeType = row[tradeTypeField] || '';
-        const status = row[statusField] || '';
+        // استخراج قيم الحقول بشكل آمن
+        const extractValue = (fieldName: string, isNumeric: boolean = false): any => {
+          const value = row[fieldName];
+          if (value === undefined) return isNumeric ? 0 : '';
+          
+          if (isNumeric) {
+            // إذا كانت القيمة نصية تحتوي على أرقام، نحاول استخراج الرقم منها
+            if (typeof value === 'string') {
+              const numericValue = parseFloat(value.replace(/[^\d.-]/g, ''));
+              return isNaN(numericValue) ? 0 : numericValue;
+            }
+            // إذا كانت رقم بالفعل
+            return typeof value === 'number' ? value : 0;
+          }
+          
+          // إذا كانت قيمة نصية، نعيدها كما هي
+          return value.toString();
+        };
+        
+        const type = extractValue(typeField);
+        const currency = extractValue(currencyField);
+        const amount = extractValue(amountField, true);
+        const realAmount = realAmountField ? extractValue(realAmountField, true) : amount;
+        const usdt = extractValue(usdtField, true);
+        const date = extractValue(dateField);
+        const tradeType = extractValue(tradeTypeField);
+        const status = extractValue(statusField);
         
         console.log('Extracted values:', {
           type, currency, amount, realAmount, usdt, date, tradeType, status
@@ -92,23 +125,42 @@ export const importExcelFile = async (file: File): Promise<P2PTransaction[]> => 
         const hasValidValues = transaction.usdt > 0 || transaction.realAmount > 0;
         console.log('Has valid values:', hasValidValues);
         
-        // التحقق من نوع الصفقة - نقبل فقط P2P
-        const isP2P = 
-          (transaction.tradeType.toLowerCase() === 'p2p') || 
-          (transaction.tradeType.toLowerCase().includes('p2p'));
-        console.log('Is P2P transaction:', isP2P, 'tradeType:', transaction.tradeType);
+        // الحصول على نوع المعاملة بشكل موحد (مع إزالة المسافات والتحويل إلى أحرف صغيرة)
+        const tradeTypeNormalized = (transaction.tradeType || '').toLowerCase().trim().replace(/\s+/g, '');
         
-        // استبعاد معاملات E-Voucher
-        const isNotEVoucher = !transaction.tradeType.toLowerCase().includes('e-voucher') && 
-                             !transaction.tradeType.toLowerCase().includes('evoucher') &&
-                             !transaction.tradeType.toLowerCase().includes('فاوتشر');
+        // التحقق من نوع الصفقة - نقبل P2P بكافة تنسيقاتها
+        const isP2P = 
+          tradeTypeNormalized === 'p2p' || 
+          tradeTypeNormalized.includes('p2p') ||
+          tradeTypeNormalized === 'بي٢بي' ||
+          tradeTypeNormalized.includes('بي٢بي') ||
+          tradeTypeNormalized === 'بيتوبي' ||
+          tradeTypeNormalized.includes('بيتوبي') ||
+          tradeTypeNormalized === 'بي-تو-بي' ||
+          tradeTypeNormalized.includes('بي-تو-بي') ||
+          tradeTypeNormalized === 'peertopeer' ||
+          tradeTypeNormalized.includes('peertopeer');
+        
+        console.log('Is P2P transaction:', isP2P, 'tradeType:', transaction.tradeType, 'normalized:', tradeTypeNormalized);
+        
+        // استبعاد معاملات E-Voucher بكافة تنسيقاتها
+        const isNotEVoucher = 
+          !tradeTypeNormalized.includes('e-voucher') && 
+          !tradeTypeNormalized.includes('evoucher') &&
+          !tradeTypeNormalized.includes('فاوتشر') &&
+          !tradeTypeNormalized.includes('ايفاوتشر') &&
+          !tradeTypeNormalized.includes('e-v') &&
+          !tradeTypeNormalized.includes('ev');
+        
         console.log('Is not E-Voucher:', isNotEVoucher);
         
         // التحقق من نوع العملية - شراء أو بيع
-        const isValidType = transaction.type.toLowerCase() === 'buy' || 
-                           transaction.type.toLowerCase() === 'sell' ||
-                           transaction.type.toLowerCase() === 'شراء' ||
-                           transaction.type.toLowerCase() === 'بيع';
+        const isValidType = 
+          transaction.type.toLowerCase() === 'buy' || 
+          transaction.type.toLowerCase() === 'sell' ||
+          transaction.type.toLowerCase() === 'شراء' ||
+          transaction.type.toLowerCase() === 'بيع';
+        
         console.log('Is Buy/Sell:', isValidType, transaction.type);
         
         // نقبل العمليات الصالحة فقط
