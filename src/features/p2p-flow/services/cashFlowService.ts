@@ -1,4 +1,4 @@
-import { read, utils, WorkBook } from 'xlsx';
+import { utils, WorkBook } from 'xlsx';
 import { P2PTransaction, CashFlowRecord, TransactionSummary, CurrencyCostInfo } from '../types/types';
 import { readExcelFile } from './eVoucherService';
 
