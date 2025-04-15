@@ -63,4 +63,12 @@ export interface TransactionSummary {
   avgSellPrice: { [currency: string]: number };
   currentBalances: { [currency: string]: number };
   currencyCostInfo: { [currency: string]: CurrencyCostInfo };  // معلومات متوسط التكلفة
+}
+
+export interface EVoucherSummary {
+  totalEGP: number;        // إجمالي المبلغ بالجنيه المصري
+  totalAED: number;        // إجمالي المبلغ بالدرهم الإماراتي
+  totalUSDT: number;       // إجمالي اليوزد المخصوم
+  avgAEDtoEGP: number;     // متوسط سعر الدرهم مقابل الجنيه
+  avgUSDTtoEGP: number;    // متوسط سعر اليوزد مقابل الجنيه
 } 

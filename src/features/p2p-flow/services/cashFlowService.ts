@@ -1,52 +1,130 @@
 import { read, utils, WorkBook } from 'xlsx';
 import { P2PTransaction, CashFlowRecord, TransactionSummary, CurrencyCostInfo } from '../types/types';
+import { readExcelFile } from './eVoucherService';
 
 // استيراد ملف Excel وتحويله إلى مصفوفة عمليات
 export const importExcelFile = async (file: File): Promise<P2PTransaction[]> => {
   try {
-    const data = await file.arrayBuffer();
-    const workbook = read(data);
-    
-    if (!workbook.SheetNames.length) {
-      throw new Error('الملف لا يحتوي على أي بيانات');
-    }
-
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = utils.sheet_to_json<any>(worksheet);
+    // استخدام خدمة readExcelFile لقراءة ملف Excel
+    const jsonData = await readExcelFile(file);
     
     if (!jsonData.length) {
       throw new Error('لا توجد بيانات في الملف');
     }
 
-    // تحويل البيانات إلى النوع المطلوب
+    console.log('Raw Data:', jsonData);
+    console.log('Available Columns:', Object.keys(jsonData[0]));
+
+    // تحويل البيانات إلى النوع المطلوب بشكل أكثر مرونة
     const transactions: P2PTransaction[] = jsonData
-      .filter(row => row.Status !== 'CANCELLED') // تجاهل العمليات الملغاة
-      .map(row => ({
-        reference: row.Reference || '',
-        type: row.Type || '',
-        currency: row.Currency || '',
-        amount: parseFloat(row.Amount || 0),
-        realAmount: parseFloat(row.RealAmount || row.Amount || 0),
-        usdtBefore: parseFloat(row.UsdtB || 0),
-        usdt: parseFloat(row.USDT || 0),
-        price: parseFloat(row.Price || 0),
-        fees: parseFloat(row.Fees || 0),
-        status: row.Status || 'COMPLETED',
-        date: row.Date || '',
-        tradeType: row.Type || '',
-        source: row.Source || ''
-      }))
-      // تصفية إضافية للبيانات غير الصالحة
+      // لا نصفي مبدئياً بناءً على الحالة للتأكد من أننا نقرأ البيانات
+      .map((row, index) => {
+        console.log(`Row ${index}:`, row);
+        
+        // البحث عن الحقول المطلوبة بطريقة أكثر مرونة
+        const findField = (possibleNames: string[]): string => {
+          for (const name of possibleNames) {
+            if (row[name] !== undefined) return name;
+          }
+          return '';
+        };
+        
+        // تحديد الحقول المطلوبة
+        const typeField = findField(['Type', 'نوع', 'نوع العملية', 'النوع']);
+        const currencyField = findField(['Currency', 'عملة', 'العملة']);
+        const amountField = findField(['Amount', 'المبلغ', 'مبلغ']);
+        const realAmountField = findField(['RealAmount', 'Real Amount', 'المبلغ الفعلي']);
+        const usdtField = findField(['USDT', 'يوزد', 'USDTAmount', 'USDT Amount']);
+        const dateField = findField(['Date', 'التاريخ', 'تاريخ', 'Created', 'Creation Date']);
+        const tradeTypeField = findField(['Trade Type', 'نوع التداول', 'TradeType']);
+        const statusField = findField(['Status', 'الحالة', 'حالة']);
+        
+        console.log('Fields found:', {
+          typeField, currencyField, amountField, realAmountField, usdtField, dateField, tradeTypeField, statusField
+        });
+        
+        const type = row[typeField] || '';
+        const currency = row[currencyField] || '';
+        const amount = parseFloat(row[amountField] || 0);
+        const realAmount = parseFloat(row[realAmountField] || row[amountField] || 0);
+        const usdt = parseFloat(row[usdtField] || 0);
+        const date = row[dateField] || '';
+        const tradeType = row[tradeTypeField] || '';
+        const status = row[statusField] || '';
+        
+        console.log('Extracted values:', {
+          type, currency, amount, realAmount, usdt, date, tradeType, status
+        });
+        
+        return {
+          reference: row.Reference || '',
+          type: type,
+          currency: currency,
+          amount: amount,
+          realAmount: realAmount,
+          usdtBefore: parseFloat(row.UsdtB || 0),
+          usdt: usdt,
+          price: parseFloat(row.Price || 0),
+          fees: parseFloat(row.Fees || 0),
+          status: status,
+          date: date,
+          tradeType: tradeType,
+          source: row.Source || ''
+        };
+      })
+      // تصفية البيانات بعد استخراجها
       .filter(transaction => {
+        console.log('Filtering P2P transaction:', transaction);
+        
+        // استبعاد الأوردرات الملغاة
+        const isNotCancelled = !(
+          transaction.status.toLowerCase().includes('cancel') || 
+          transaction.status.toLowerCase().includes('ملغي') ||
+          transaction.status.toLowerCase().includes('ملغاة')
+        );
+        console.log('Is not cancelled:', isNotCancelled, transaction.status);
+        
+        // التحقق من تاريخ العملية
         const isValidDate = transaction.date && !isNaN(new Date(transaction.date).getTime());
+        console.log('Has valid date:', isValidDate, transaction.date);
+        
+        // التحقق من وجود قيم في الصفقة
         const hasValidValues = transaction.usdt > 0 || transaction.realAmount > 0;
-        return isValidDate && hasValidValues && (transaction.type === 'Buy' || transaction.type === 'Sell');
+        console.log('Has valid values:', hasValidValues);
+        
+        // التحقق من نوع الصفقة - نقبل فقط P2P
+        const isP2P = 
+          (transaction.tradeType.toLowerCase() === 'p2p') || 
+          (transaction.tradeType.toLowerCase().includes('p2p'));
+        console.log('Is P2P transaction:', isP2P, 'tradeType:', transaction.tradeType);
+        
+        // استبعاد معاملات E-Voucher
+        const isNotEVoucher = !transaction.tradeType.toLowerCase().includes('e-voucher') && 
+                             !transaction.tradeType.toLowerCase().includes('evoucher') &&
+                             !transaction.tradeType.toLowerCase().includes('فاوتشر');
+        console.log('Is not E-Voucher:', isNotEVoucher);
+        
+        // التحقق من نوع العملية - شراء أو بيع
+        const isValidType = transaction.type.toLowerCase() === 'buy' || 
+                           transaction.type.toLowerCase() === 'sell' ||
+                           transaction.type.toLowerCase() === 'شراء' ||
+                           transaction.type.toLowerCase() === 'بيع';
+        console.log('Is Buy/Sell:', isValidType, transaction.type);
+        
+        // نقبل العمليات الصالحة فقط
+        return isNotCancelled && isValidDate && hasValidValues && isP2P && isNotEVoucher && isValidType;
       });
+
+    console.log('Filtered P2P Transactions:', transactions.length);
+    
+    if (transactions.length === 0) {
+      console.warn('No valid P2P transactions found after filtering');
+    }
 
     // ترتيب العمليات حسب التاريخ
     transactions.sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
+      const dateA = new Date(a.date).getTime() || 0;
+      const dateB = new Date(b.date).getTime() || 0;
       return dateA - dateB;
     });
 

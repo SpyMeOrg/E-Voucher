@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { writeFile } from 'xlsx';
-import { BankBalance, P2PTransaction, CashFlowRecord, TransactionSummary } from '../types/types';
+import { read, utils, writeFile } from 'xlsx';
+import { BankBalance, P2PTransaction, CashFlowRecord, TransactionSummary, EVoucherSummary as EVoucherSummaryType } from '../types/types';
 import { importExcelFile, createCashFlowRecords, calculateTransactionSummary, exportCashFlowToExcel } from '../services/cashFlowService';
+import { calculateEVoucherSummary, readExcelFile } from '../services/eVoucherService';
+import { EVoucherSummary } from './EVoucherSummary';
 
 export const P2PFlowTab: React.FC = () => {
   // الأرصدة الأولية
@@ -128,32 +130,56 @@ export const P2PFlowTab: React.FC = () => {
         setLoading(false);
         return;
       }
-      
-      const importedTransactions = await importExcelFile(file);
-      
-      if (importedTransactions.length === 0) {
-        setError('لم يتم العثور على عمليات صالحة في الملف');
-        setLoading(false);
-        return;
+
+      console.log('Starting file import:', file.name);
+
+      try {
+        // استخدام وظيفة readExcelFile لقراءة ملف Excel بطريقة أكثر موثوقية
+        console.log('Reading Excel file for E-Voucher data');
+        const jsonData = await readExcelFile(file);
+
+        console.log('JSON data extracted, rows:', jsonData.length);
+        if (jsonData.length > 0) {
+          console.log('Sample row:', jsonData[0]);
+        }
+
+        // حساب ملخص E-Voucher
+        try {
+          console.log('Calculating E-Voucher summary');
+          const eVoucherSummaryData = calculateEVoucherSummary(jsonData);
+          console.log('E-Voucher summary calculated:', eVoucherSummaryData);
+          setEVoucherSummary(eVoucherSummaryData);
+        } catch (evoucherError) {
+          console.error('Error calculating E-Voucher summary:', evoucherError);
+        }
+
+        // استيراد عمليات P2P
+        try {
+          console.log('Importing P2P transactions');
+          const importedTransactions = await importExcelFile(file);
+          console.log('P2P transactions imported:', importedTransactions.length);
+          
+          if (importedTransactions.length === 0) {
+            setError('لم يتم العثور على عمليات P2P صالحة في الملف');
+          } else {
+            setTransactions(importedTransactions);
+          }
+        } catch (importError) {
+          console.error('Error importing P2P transactions:', importError);
+          setError(importError instanceof Error ? importError.message : 'حدث خطأ أثناء استيراد عمليات P2P');
+        }
+      } catch (readError) {
+        console.error('Error reading file:', readError);
+        setError(readError instanceof Error ? readError.message : 'حدث خطأ أثناء قراءة الملف');
       }
       
-      // تصفية العمليات غير الصالحة قبل الحفظ
-      const validTransactions = importedTransactions.filter(transaction => {
-        // تحقق من وجود تاريخ صالح
-        const isValidDate = transaction.date && !isNaN(new Date(transaction.date).getTime());
-        // تحقق من وجود قيم معنوية
-        const hasValidValues = transaction.usdt > 0 || transaction.realAmount > 0;
-        return isValidDate && hasValidValues;
-      });
-      
-      setTransactions(validTransactions);
       setLoading(false);
       
-      // إعادة تعيين حقل الملف
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (error) {
+      console.error('Error in overall import process:', error);
       setError(error instanceof Error ? error.message : 'حدث خطأ أثناء استيراد الملف');
       setLoading(false);
     }
@@ -201,6 +227,8 @@ export const P2PFlowTab: React.FC = () => {
   const formatCurrency = (value: number, currency: string) => {
     return `${value.toFixed(4)} ${currency}`;
   };
+
+  const [eVoucherSummary, setEVoucherSummary] = useState<EVoucherSummaryType | null>(null);
 
   return (
     <div className="container mx-auto p-4 md:p-6 max-w-6xl">
@@ -366,6 +394,14 @@ export const P2PFlowTab: React.FC = () => {
             </div>
           )}
         </div>
+        
+        {/* إضافة قسم E-Voucher قبل سجل التدفق النقدي */}
+        {eVoucherSummary && (
+          <div className="mb-8 bg-gray-50 p-5 rounded-xl border border-gray-100">
+            <h3 className="text-xl font-semibold mb-4 text-right text-gray-700">ملخص عمليات E-Voucher</h3>
+            <EVoucherSummary summary={eVoucherSummary} />
+          </div>
+        )}
         
         {/* قسم ملخص الإحصائيات */}
         {summary && (
