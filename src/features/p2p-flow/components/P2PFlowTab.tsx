@@ -160,13 +160,16 @@ export const P2PFlowTab: React.FC = () => {
           console.log('P2P transactions imported:', importedTransactions.length);
           
           if (importedTransactions.length === 0) {
-            setError('لم يتم العثور على عمليات P2P صالحة في الملف');
+            setError('لم يتم العثور على عمليات P2P صالحة في الملف. الرجاء التحقق من الملف والتأكد من وجود معاملات P2P فيه.');
+            // إخفاء مؤشر التحميل لكن عدم حجب ملخص E-Voucher إذا كان موجودًا
+            setLoading(false);
           } else {
             setTransactions(importedTransactions);
+            setError(null); // إزالة رسالة الخطأ إذا كانت موجودة سابقًا
           }
         } catch (importError) {
           console.error('Error importing P2P transactions:', importError);
-          setError(importError instanceof Error ? importError.message : 'حدث خطأ أثناء استيراد عمليات P2P');
+          setError(importError instanceof Error ? `خطأ: ${importError.message}` : 'حدث خطأ أثناء استيراد عمليات P2P');
         }
       } catch (readError) {
         console.error('Error reading file:', readError);

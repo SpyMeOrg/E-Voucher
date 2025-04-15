@@ -89,13 +89,26 @@ export const importExcelFile = async (file: File): Promise<P2PTransaction[]> => 
           type, currency, amount, realAmount, usdt, date, tradeType, status
         });
         
+        // طباعة معلومات تفصيلية عن الصف للمساعدة في التشخيص
+        console.log(`Row ${index} detailed info:`, {
+          raw: row,
+          extractedType: type,
+          extractedCurrency: currency,
+          extractedAmount: amount,
+          extractedRealAmount: realAmount,
+          extractedUsdt: usdt,
+          extractedDate: date,
+          extractedTradeType: tradeType,
+          extractedStatus: status
+        });
+        
         return {
           reference: row.Reference || '',
           type: type,
           currency: currency,
           amount: amount,
           realAmount: realAmount,
-          usdtBefore: parseFloat(row.UsdtB || 0),
+          usdtBefore: extractValue(row.UsdtB !== undefined ? 'UsdtB' : 'Usdt B', true),
           usdt: usdt,
           price: parseFloat(row.Price || 0),
           fees: parseFloat(row.Fees || 0),
@@ -107,9 +120,9 @@ export const importExcelFile = async (file: File): Promise<P2PTransaction[]> => 
       })
       // تصفية البيانات بعد استخراجها
       .filter(transaction => {
-        console.log('Filtering P2P transaction:', transaction);
+        console.log('Filtering transaction:', transaction);
         
-        // استبعاد الأوردرات الملغاة
+        // استبعاد الأوردرات الملغاة (إلا إذا كان التطبيق في وضع الاختبار)
         const isNotCancelled = !(
           transaction.status.toLowerCase().includes('cancel') || 
           transaction.status.toLowerCase().includes('ملغي') ||
@@ -144,15 +157,39 @@ export const importExcelFile = async (file: File): Promise<P2PTransaction[]> => 
         console.log('Is P2P transaction:', isP2P, 'tradeType:', transaction.tradeType, 'normalized:', tradeTypeNormalized);
         
         // استبعاد معاملات E-Voucher بكافة تنسيقاتها
-        const isNotEVoucher = 
-          !tradeTypeNormalized.includes('e-voucher') && 
-          !tradeTypeNormalized.includes('evoucher') &&
-          !tradeTypeNormalized.includes('فاوتشر') &&
-          !tradeTypeNormalized.includes('ايفاوتشر') &&
-          !tradeTypeNormalized.includes('e-v') &&
-          !tradeTypeNormalized.includes('ev');
+        const isEVoucher = 
+          tradeTypeNormalized.includes('e-voucher') || 
+          tradeTypeNormalized.includes('evoucher') ||
+          tradeTypeNormalized.includes('فاوتشر') ||
+          tradeTypeNormalized.includes('ايفاوتشر') ||
+          tradeTypeNormalized.includes('e-v') ||
+          tradeTypeNormalized.includes('ev');
         
-        console.log('Is not E-Voucher:', isNotEVoucher);
+        // معلومات إضافية للاستدلال على نوع المعاملة
+        const currencyIsAED = transaction.currency.toUpperCase() === 'AED';
+        const currencyIsEGP = transaction.currency.toUpperCase() === 'EGP';
+        
+        // المعاملات التي تكون بالدرهم الإماراتي عادة هي P2P
+        const likelyP2PBasedOnCurrency = currencyIsAED;
+        
+        // معاملات الجنيه المصري مع قيم USDT صغيرة غالباً ما تكون E-Voucher
+        const likelyEVoucherBasedOnCurrency = currencyIsEGP && transaction.usdt < 100;
+        
+        // إذا لم يكن هناك تحديد صريح لنوع المعاملة، يمكن اعتبارها P2P افتراضياً
+        // إذا لم تكن E-Voucher وحقل نوع المعاملة فارغ أو غير محدد بوضوح
+        const isDefaultP2P = !isEVoucher && (
+          tradeTypeNormalized === '' || 
+          (!isP2P && !isEVoucher && likelyP2PBasedOnCurrency && !likelyEVoucherBasedOnCurrency)
+        );
+        
+        // نعتبر المعاملة P2P إذا كانت محددة صراحةً أو افتراضياً
+        const isConsideredP2P = isP2P || isDefaultP2P;
+        
+        console.log('Is E-Voucher:', isEVoucher);
+        console.log('Likely P2P based on currency:', likelyP2PBasedOnCurrency);
+        console.log('Likely E-Voucher based on currency:', likelyEVoucherBasedOnCurrency);
+        console.log('Is default P2P:', isDefaultP2P);
+        console.log('Is considered P2P:', isConsideredP2P);
         
         // التحقق من نوع العملية - شراء أو بيع
         const isValidType = 
@@ -164,7 +201,10 @@ export const importExcelFile = async (file: File): Promise<P2PTransaction[]> => 
         console.log('Is Buy/Sell:', isValidType, transaction.type);
         
         // نقبل العمليات الصالحة فقط
-        return isNotCancelled && isValidDate && hasValidValues && isP2P && isNotEVoucher && isValidType;
+        const isValid = isNotCancelled && isValidDate && hasValidValues && isConsideredP2P && !isEVoucher && isValidType;
+        console.log('Is Valid P2P transaction:', isValid);
+        
+        return isValid;
       });
 
     console.log('Filtered P2P Transactions:', transactions.length);
