@@ -466,7 +466,7 @@ export const P2PFlowTab: React.FC = () => {
                     </ul>
                   </div>
                   
-                  {/* متوسط التكلفة */}
+                  {/* متوسط التكلفة - تم تعديل طريقة العرض */}
                   <div>
                     <h4 className="font-medium text-purple-700 mb-2 text-right">متوسط سعر التكلفة</h4>
                     <ul className="space-y-2 text-right">
