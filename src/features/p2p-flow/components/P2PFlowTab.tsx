@@ -473,10 +473,15 @@ export const P2PFlowTab: React.FC = () => {
                       {Object.entries(summary.currencyCostInfo || {}).map(([currency, costInfo]) => {
                         // نعرض فقط العملات التي لها رصيد
                         if (summary.currentBalances[currency] > 0) {
+                          // إذا كانت العملة هي درهم، نستخدم 3.67 وإلا نستخدم القيمة الحالية
+                          const displayRate = currency === 'AED' 
+                            ? '3.67'
+                            : costInfo.weightedAvgRate.toFixed(4);
+                          
                           return (
                             <li key={`cost-${currency}`}>
                               <span className="font-medium">{currency}: </span>
-                              {costInfo.weightedAvgRate.toFixed(4)} AED/USDT
+                              {displayRate} AED/USDT
                             </li>
                           );
                         }
