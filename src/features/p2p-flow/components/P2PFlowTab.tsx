@@ -120,67 +120,92 @@ export const P2PFlowTab: React.FC = () => {
   };
 
   // استيراد ملف Excel
-  const handleImportExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (file: File) => {
     try {
-      setError(null);
+      // محاولة استيراد الملف
       setLoading(true);
+      setError(null);
       
-      const file = event.target.files?.[0];
-      if (!file) {
+      console.log('بدء استيراد الملف:', file.name);
+      
+      // استيراد عمليات P2P
+      const importedTransactions = await importExcelFile(file);
+      console.log('تم استيراد العمليات:', importedTransactions.length);
+      
+      if (importedTransactions.length === 0) {
+        console.log('لا توجد عمليات P2P في الملف');
+        setError('لا توجد عمليات P2P في الملف. تأكد من أن الملف يحتوي على بيانات صالحة وأعمدة مناسبة.');
         setLoading(false);
         return;
       }
-
-      console.log('Starting file import:', file.name);
-
+      
+      // استيراد كل العمليات بدون تصفية لحساب الإحصائيات
+      const allTransactions = await importExcelFile(file, true);
+      
+      // حساب إحصائيات العمليات
+      const stats = {
+        p2p: {
+          total: 0,
+          completed: 0,
+          cancelled: 0
+        },
+        evoucher: {
+          total: 0,
+          completed: 0,
+          cancelled: 0
+        }
+      };
+      
+      // حساب عدد العمليات حسب النوع والحالة
+      if (allTransactions && allTransactions.length) {
+        stats.p2p.total = allTransactions.filter(t => t.tradeType === 'P2P').length;
+        stats.p2p.completed = allTransactions.filter(t => t.tradeType === 'P2P' && t.status === 'COMPLETED').length;
+        stats.p2p.cancelled = allTransactions.filter(t => t.tradeType === 'P2P' && t.status === 'CANCELLED').length;
+        
+        stats.evoucher.total = allTransactions.filter(t => t.tradeType === 'E-Voucher').length;
+        stats.evoucher.completed = allTransactions.filter(t => t.tradeType === 'E-Voucher' && t.status === 'COMPLETED').length;
+        stats.evoucher.cancelled = allTransactions.filter(t => t.tradeType === 'E-Voucher' && t.status === 'CANCELLED').length;
+      }
+      
+      // عرض رسالة النجاح مع الإحصائيات
+      setSuccessMessage(
+        `تم استيراد ${allTransactions.length} عملية بنجاح
+- عمليات P2P: ${stats.p2p.total} (${stats.p2p.completed} مكتملة، ${stats.p2p.cancelled} ملغاة)
+- عمليات E-Voucher: ${stats.evoucher.total} (${stats.evoucher.completed} مكتملة، ${stats.evoucher.cancelled} ملغاة)
+- عدد العمليات بعد التصفية: ${importedTransactions.length} (P2P مكتملة فقط)`
+      );
+      
+      setTransactions(importedTransactions);
+      
+      // استيراد ملخص E-Voucher إذا أمكن
       try {
-        // استخدام وظيفة readExcelFile لقراءة ملف Excel بطريقة أكثر موثوقية
-        console.log('Reading Excel file for E-Voucher data');
+        console.log('حساب ملخص E-Voucher');
         const jsonData = await readExcelFile(file);
-
-        console.log('JSON data extracted, rows:', jsonData.length);
-        if (jsonData.length > 0) {
-          console.log('Sample row:', jsonData[0]);
-        }
-
-        // حساب ملخص E-Voucher
-        try {
-          console.log('Calculating E-Voucher summary');
-          const eVoucherSummaryData = calculateEVoucherSummary(jsonData);
-          console.log('E-Voucher summary calculated:', eVoucherSummaryData);
-          setEVoucherSummary(eVoucherSummaryData);
-        } catch (evoucherError) {
-          console.error('Error calculating E-Voucher summary:', evoucherError);
-        }
-
-        // استيراد عمليات P2P
-        try {
-          console.log('Importing P2P transactions');
-          const importedTransactions = await importExcelFile(file);
-          console.log('P2P transactions imported:', importedTransactions.length);
-          
-          if (importedTransactions.length === 0) {
-            setError('لم يتم العثور على عمليات P2P صالحة في الملف');
-          } else {
-            setTransactions(importedTransactions);
-          }
-        } catch (importError) {
-          console.error('Error importing P2P transactions:', importError);
-          setError(importError instanceof Error ? importError.message : 'حدث خطأ أثناء استيراد عمليات P2P');
-        }
-      } catch (readError) {
-        console.error('Error reading file:', readError);
-        setError(readError instanceof Error ? readError.message : 'حدث خطأ أثناء قراءة الملف');
+        const eVoucherSummaryData = calculateEVoucherSummary(jsonData);
+        setEVoucherSummary(eVoucherSummaryData);
+        console.log('تم حساب ملخص E-Voucher:', eVoucherSummaryData);
+      } catch (evoucherError) {
+        console.error('خطأ في حساب ملخص E-Voucher:', evoucherError);
+        // لا نعرض خطأ للمستخدم هنا لأن E-Voucher اختياري
       }
       
       setLoading(false);
-      
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     } catch (error) {
-      console.error('Error in overall import process:', error);
-      setError(error instanceof Error ? error.message : 'حدث خطأ أثناء استيراد الملف');
+      console.error('خطأ في استيراد الملف:', error);
+      
+      // عرض رسالة خطأ أكثر تفصيلاً
+      let errorMessage = 'حدث خطأ أثناء استيراد الملف';
+      
+      if (error instanceof Error && error.message) {
+        errorMessage = error.message;
+        
+        // إضافة نصائح مفيدة بناءً على نوع الخطأ
+        if (errorMessage.includes('لم يتم العثور على عمليات')) {
+          errorMessage = `${errorMessage} تأكد من أن الملف يحتوي على الأعمدة الصحيحة: Type (Buy/Sell)، Currency، Amount، USDT، Price.`;
+        }
+      }
+      
+      setError(errorMessage);
       setLoading(false);
     }
   };
@@ -230,6 +255,8 @@ export const P2PFlowTab: React.FC = () => {
 
   const [eVoucherSummary, setEVoucherSummary] = useState<EVoucherSummaryType | null>(null);
 
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
   return (
     <div className="container mx-auto p-4 md:p-6 max-w-6xl">
       <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
@@ -240,6 +267,16 @@ export const P2PFlowTab: React.FC = () => {
         {error && (
           <div className="mb-6 p-4 bg-red-50 text-red-700 border border-red-200 rounded-xl text-right">
             <p>{error}</p>
+          </div>
+        )}
+        
+        {/* رسالة النجاح مع إحصائيات العمليات */}
+        {successMessage && (
+          <div className="mb-6 p-4 bg-green-50 text-green-700 border border-green-200 rounded-xl text-right whitespace-pre-line">
+            <p className="font-semibold mb-1">تمت العملية بنجاح!</p>
+            <pre className="text-sm font-mono bg-white p-3 rounded-lg border border-green-100 overflow-x-auto">
+              {successMessage}
+            </pre>
           </div>
         )}
         
@@ -350,7 +387,13 @@ export const P2PFlowTab: React.FC = () => {
               <input
                 type="file"
                 accept=".xlsx,.xls"
-                onChange={handleImportExcel}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    // استخدام دالة handleFileSelect للتعامل مع ملف Excel
+                    handleFileSelect(file);
+                  }
+                }}
                 className="hidden"
                 ref={fileInputRef}
               />
