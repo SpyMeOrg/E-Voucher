@@ -181,12 +181,52 @@ export const P2PFlowTab: React.FC = () => {
       try {
         console.log('حساب ملخص E-Voucher');
         const jsonData = await readExcelFile(file);
+<<<<<<< HEAD
         const eVoucherSummaryData = calculateEVoucherSummary(jsonData);
         setEVoucherSummary(eVoucherSummaryData);
         console.log('تم حساب ملخص E-Voucher:', eVoucherSummaryData);
       } catch (evoucherError) {
         console.error('خطأ في حساب ملخص E-Voucher:', evoucherError);
         // لا نعرض خطأ للمستخدم هنا لأن E-Voucher اختياري
+=======
+
+        console.log('JSON data extracted, rows:', jsonData.length);
+        if (jsonData.length > 0) {
+          console.log('Sample row:', jsonData[0]);
+        }
+
+        // حساب ملخص E-Voucher
+        try {
+          console.log('Calculating E-Voucher summary');
+          const eVoucherSummaryData = calculateEVoucherSummary(jsonData);
+          console.log('E-Voucher summary calculated:', eVoucherSummaryData);
+          setEVoucherSummary(eVoucherSummaryData);
+        } catch (evoucherError) {
+          console.error('Error calculating E-Voucher summary:', evoucherError);
+        }
+
+        // استيراد عمليات P2P
+        try {
+          console.log('Importing P2P transactions');
+          const importedTransactions = await importExcelFile(file);
+          console.log('P2P transactions imported:', importedTransactions.length);
+          
+          if (importedTransactions.length === 0) {
+            setError('لم يتم العثور على عمليات P2P صالحة في الملف. الرجاء التحقق من الملف والتأكد من وجود معاملات P2P فيه.');
+            // إخفاء مؤشر التحميل لكن عدم حجب ملخص E-Voucher إذا كان موجودًا
+            setLoading(false);
+          } else {
+            setTransactions(importedTransactions);
+            setError(null); // إزالة رسالة الخطأ إذا كانت موجودة سابقًا
+          }
+        } catch (importError) {
+          console.error('Error importing P2P transactions:', importError);
+          setError(importError instanceof Error ? `خطأ: ${importError.message}` : 'حدث خطأ أثناء استيراد عمليات P2P');
+        }
+      } catch (readError) {
+        console.error('Error reading file:', readError);
+        setError(readError instanceof Error ? readError.message : 'حدث خطأ أثناء قراءة الملف');
+>>>>>>> 39d0755a04d5b326afe9017864bde352b2cff324
       }
       
       setLoading(false);
