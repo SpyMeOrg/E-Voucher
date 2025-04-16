@@ -35,7 +35,6 @@ export const importExcelFile = async (file: File, returnAllTransactions = false)
     let allTransactions: P2PTransaction[] = [];
     let p2pTransactionsCount = 0;
     let evoucherTransactionsCount = 0;
-    let invalidTransactionsCount = 0;
     let finalFilteredTransactions: P2PTransaction[] = [];
 
     // تنفيذ استراتيجية اكتشاف أسماء الأعمدة المختلفة
@@ -87,9 +86,8 @@ export const importExcelFile = async (file: File, returnAllTransactions = false)
         // تسجيل البيانات المستخرجة للتشخيص
         console.log(`معالجة الصف ${index}:`, JSON.stringify(row));
         
-<<<<<<< HEAD
         // استخراج البيانات من الأعمدة المحددة
-        const rawType = row[typeColumn] || '';
+        let rawType = row[typeColumn] || '';
         const currency = row[currencyColumn] || 'AED'; // افتراض AED إذا كان فارغاً
         const amount = parseFloat(row[amountColumn] || 0);
         const realAmount = parseFloat(row[realAmountColumn] || row[amountColumn] || 0);
@@ -170,90 +168,10 @@ export const importExcelFile = async (file: File, returnAllTransactions = false)
           // إذا كنا في شك، نستخدم Buy كافتراضي
           rawType = 'Buy';
         }
-=======
-        // البحث عن الحقول المطلوبة بطريقة أكثر مرونة
-        const findField = (possibleNames: string[]): string => {
-          // تحويل مفاتيح الصف إلى مصفوفة
-          const rowKeys = Object.keys(row);
-          
-          // البحث عن اسم الحقل المطابق بغض النظر عن حالة الأحرف
-          for (const name of possibleNames) {
-            // البحث المباشر بالاسم
-            if (row[name] !== undefined) return name;
-            
-            // البحث بغض النظر عن حالة الأحرف
-            const matchingKey = rowKeys.find(key => 
-              key.toLowerCase() === name.toLowerCase() || 
-              key.toLowerCase().includes(name.toLowerCase())
-            );
-            
-            if (matchingKey) return matchingKey;
-          }
-          
-          return '';
-        };
-        
-        // تحديد الحقول المطلوبة
-        const typeField = findField(['Type', 'نوع', 'نوع العملية', 'النوع']);
-        const currencyField = findField(['Currency', 'عملة', 'العملة']);
-        const amountField = findField(['Amount', 'المبلغ', 'مبلغ', 'قيمة']);
-        const realAmountField = findField(['RealAmount', 'Real Amount', 'المبلغ الفعلي', 'قيمة حقيقية']);
-        const usdtField = findField(['USDT', 'يوزد', 'USDTAmount', 'USDT Amount', 'مبلغ USDT']);
-        const dateField = findField(['Date', 'التاريخ', 'تاريخ', 'Created', 'Creation Date', 'وقت']);
-        const tradeTypeField = findField(['Trade Type', 'نوع التداول', 'TradeType', 'نوع المعاملة', 'نوع العملية']);
-        const statusField = findField(['Status', 'الحالة', 'حالة']);
->>>>>>> 39d0755a04d5b326afe9017864bde352b2cff324
         
         const reference = row.Reference || `row-${index}`;
         
-<<<<<<< HEAD
         console.log(`صف ${index}: Reference=${reference}, Type=${rawType}, Currency=${currency}, USDT=${usdt}, TradeType=${tradeType}`);
-=======
-        // استخراج قيم الحقول بشكل آمن
-        const extractValue = (fieldName: string, isNumeric: boolean = false): any => {
-          const value = row[fieldName];
-          if (value === undefined) return isNumeric ? 0 : '';
-          
-          if (isNumeric) {
-            // إذا كانت القيمة نصية تحتوي على أرقام، نحاول استخراج الرقم منها
-            if (typeof value === 'string') {
-              const numericValue = parseFloat(value.replace(/[^\d.-]/g, ''));
-              return isNaN(numericValue) ? 0 : numericValue;
-            }
-            // إذا كانت رقم بالفعل
-            return typeof value === 'number' ? value : 0;
-          }
-          
-          // إذا كانت قيمة نصية، نعيدها كما هي
-          return value.toString();
-        };
-        
-        const type = extractValue(typeField);
-        const currency = extractValue(currencyField);
-        const amount = extractValue(amountField, true);
-        const realAmount = realAmountField ? extractValue(realAmountField, true) : amount;
-        const usdt = extractValue(usdtField, true);
-        const date = extractValue(dateField);
-        const tradeType = extractValue(tradeTypeField);
-        const status = extractValue(statusField);
-        
-        console.log('Extracted values:', {
-          type, currency, amount, realAmount, usdt, date, tradeType, status
-        });
->>>>>>> 39d0755a04d5b326afe9017864bde352b2cff324
-        
-        // طباعة معلومات تفصيلية عن الصف للمساعدة في التشخيص
-        console.log(`Row ${index} detailed info:`, {
-          raw: row,
-          extractedType: type,
-          extractedCurrency: currency,
-          extractedAmount: amount,
-          extractedRealAmount: realAmount,
-          extractedUsdt: usdt,
-          extractedDate: date,
-          extractedTradeType: tradeType,
-          extractedStatus: status
-        });
         
         return {
           reference: reference,
@@ -261,11 +179,7 @@ export const importExcelFile = async (file: File, returnAllTransactions = false)
           currency: currency,
           amount: amount,
           realAmount: realAmount,
-<<<<<<< HEAD
           usdtBefore: usdtBefore,
-=======
-          usdtBefore: extractValue(row.UsdtB !== undefined ? 'UsdtB' : 'Usdt B', true),
->>>>>>> 39d0755a04d5b326afe9017864bde352b2cff324
           usdt: usdt,
           price: price,
           fees: fees,
@@ -274,97 +188,6 @@ export const importExcelFile = async (file: File, returnAllTransactions = false)
           tradeType: tradeType,
           source: row[sourceColumn] || ''
         };
-<<<<<<< HEAD
-=======
-      })
-      // تصفية البيانات بعد استخراجها
-      .filter(transaction => {
-        console.log('Filtering transaction:', transaction);
-        
-        // استبعاد الأوردرات الملغاة (إلا إذا كان التطبيق في وضع الاختبار)
-        const isNotCancelled = !(
-          transaction.status.toLowerCase().includes('cancel') || 
-          transaction.status.toLowerCase().includes('ملغي') ||
-          transaction.status.toLowerCase().includes('ملغاة')
-        );
-        console.log('Is not cancelled:', isNotCancelled, transaction.status);
-        
-        // التحقق من تاريخ العملية
-        const isValidDate = transaction.date && !isNaN(new Date(transaction.date).getTime());
-        console.log('Has valid date:', isValidDate, transaction.date);
-        
-        // التحقق من وجود قيم في الصفقة
-        const hasValidValues = transaction.usdt > 0 || transaction.realAmount > 0;
-        console.log('Has valid values:', hasValidValues);
-        
-        // الحصول على نوع المعاملة بشكل موحد (مع إزالة المسافات والتحويل إلى أحرف صغيرة)
-        const tradeTypeNormalized = (transaction.tradeType || '').toLowerCase().trim().replace(/\s+/g, '');
-        
-        // التحقق من نوع الصفقة - نقبل P2P بكافة تنسيقاتها
-        const isP2P = 
-          tradeTypeNormalized === 'p2p' || 
-          tradeTypeNormalized.includes('p2p') ||
-          tradeTypeNormalized === 'بي٢بي' ||
-          tradeTypeNormalized.includes('بي٢بي') ||
-          tradeTypeNormalized === 'بيتوبي' ||
-          tradeTypeNormalized.includes('بيتوبي') ||
-          tradeTypeNormalized === 'بي-تو-بي' ||
-          tradeTypeNormalized.includes('بي-تو-بي') ||
-          tradeTypeNormalized === 'peertopeer' ||
-          tradeTypeNormalized.includes('peertopeer');
-        
-        console.log('Is P2P transaction:', isP2P, 'tradeType:', transaction.tradeType, 'normalized:', tradeTypeNormalized);
-        
-        // استبعاد معاملات E-Voucher بكافة تنسيقاتها
-        const isEVoucher = 
-          tradeTypeNormalized.includes('e-voucher') || 
-          tradeTypeNormalized.includes('evoucher') ||
-          tradeTypeNormalized.includes('فاوتشر') ||
-          tradeTypeNormalized.includes('ايفاوتشر') ||
-          tradeTypeNormalized.includes('e-v') ||
-          tradeTypeNormalized.includes('ev');
-        
-        // معلومات إضافية للاستدلال على نوع المعاملة
-        const currencyIsAED = transaction.currency.toUpperCase() === 'AED';
-        const currencyIsEGP = transaction.currency.toUpperCase() === 'EGP';
-        
-        // المعاملات التي تكون بالدرهم الإماراتي عادة هي P2P
-        const likelyP2PBasedOnCurrency = currencyIsAED;
-        
-        // معاملات الجنيه المصري مع قيم USDT صغيرة غالباً ما تكون E-Voucher
-        const likelyEVoucherBasedOnCurrency = currencyIsEGP && transaction.usdt < 100;
-        
-        // إذا لم يكن هناك تحديد صريح لنوع المعاملة، يمكن اعتبارها P2P افتراضياً
-        // إذا لم تكن E-Voucher وحقل نوع المعاملة فارغ أو غير محدد بوضوح
-        const isDefaultP2P = !isEVoucher && (
-          tradeTypeNormalized === '' || 
-          (!isP2P && !isEVoucher && likelyP2PBasedOnCurrency && !likelyEVoucherBasedOnCurrency)
-        );
-        
-        // نعتبر المعاملة P2P إذا كانت محددة صراحةً أو افتراضياً
-        const isConsideredP2P = isP2P || isDefaultP2P;
-        
-        console.log('Is E-Voucher:', isEVoucher);
-        console.log('Likely P2P based on currency:', likelyP2PBasedOnCurrency);
-        console.log('Likely E-Voucher based on currency:', likelyEVoucherBasedOnCurrency);
-        console.log('Is default P2P:', isDefaultP2P);
-        console.log('Is considered P2P:', isConsideredP2P);
-        
-        // التحقق من نوع العملية - شراء أو بيع
-        const isValidType = 
-          transaction.type.toLowerCase() === 'buy' || 
-          transaction.type.toLowerCase() === 'sell' ||
-          transaction.type.toLowerCase() === 'شراء' ||
-          transaction.type.toLowerCase() === 'بيع';
-        
-        console.log('Is Buy/Sell:', isValidType, transaction.type);
-        
-        // نقبل العمليات الصالحة فقط
-        const isValid = isNotCancelled && isValidDate && hasValidValues && isConsideredP2P && !isEVoucher && isValidType;
-        console.log('Is Valid P2P transaction:', isValid);
-        
-        return isValid;
->>>>>>> 39d0755a04d5b326afe9017864bde352b2cff324
       });
       
     console.log(`تم تحويل ${allTransactions.length} صف إلى كائنات العمليات`);
@@ -388,9 +211,7 @@ export const importExcelFile = async (file: File, returnAllTransactions = false)
       }
       
       // نتساهل في شرط التاريخ - إذا كان فارغًا نعتبره صالحًا ونضيف تاريخًا افتراضيًا
-      let isValidDate = true;
       if (!transaction.date || isNaN(new Date(transaction.date).getTime())) {
-        isValidDate = false;
         transaction.date = new Date().toISOString().split('T')[0]; // استخدام تاريخ اليوم كافتراضي
         console.log(`تصحيح تاريخ غير صالح لـ ${transaction.reference} إلى ${transaction.date}`);
       }
