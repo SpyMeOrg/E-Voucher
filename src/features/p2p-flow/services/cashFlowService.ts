@@ -362,10 +362,20 @@ export const createCashFlowRecords = (
   Object.keys(initialBalances).forEach(currency => {
     // القيمة الافتراضية لمعدل الصرف هي 3.67 لليوزد و 1 لباقي العملات
     const initialRate = initialRates[currency] || (currency === 'USDT' ? 3.67 : 1);
+    
+    // تحديد وحدة القياس بشكل صحيح حسب العملة
+    let weightedRate = initialRate;
+    
+    // إذا كانت العملة AED أو عملة أخرى غير USDT، نريد أن نعكس المعدل
+    if (currency !== 'USDT' && initialRate) {
+      // نستخدم 1/initialRate للعملات غير USDT لتعبر عن USDT/العملة
+      weightedRate = initialRate;
+    }
+    
     costInfo[currency] = {
       totalAmount: initialBalances[currency] || 0,
       totalCostInBase: (initialBalances[currency] || 0) * initialRate,
-      weightedAvgRate: initialRate,
+      weightedAvgRate: weightedRate,
       initialAmount: initialBalances[currency] || 0,
       initialRate: initialRate,
       acquiredAmount: 0
@@ -426,16 +436,20 @@ export const createCashFlowRecords = (
       
       // تحديث معلومات متوسط التكلفة للعملة المحلية
       const currencyCostInfo = { ...updatedCostInfo[transaction.currency] };
-      currencyCostInfo.totalAmount -= transaction.realAmount;
+      currencyCostInfo.totalAmount += transaction.realAmount;
       
-      // تحسين حساب التكلفة الإجمالية للعملة المحلية
-      // نحافظ على نسبة التكلفة بين المبلغ الأولي والمبلغ المتبقي
-      if (currencyCostInfo.totalAmount < currencyCostInfo.initialAmount) {
-        // إذا كان المبلغ المتبقي أقل من المبلغ الأولي، نقلل قيمة المبلغ الأصلي
-        currencyCostInfo.initialAmount = currencyCostInfo.totalAmount;
+      // نستخدم الطريقة الأصلية لحساب متوسط تكلفة الدرهم
+      // بما في ذلك الأرباح المتراكمة التي تعكس القيمة الحقيقية
+      currencyCostInfo.acquiredAmount += transaction.realAmount;
+      
+      // تحديث التكلفة الإجمالية للعملة المحلية بناءً على البيع الجديد
+      currencyCostInfo.totalCostInBase = (currencyCostInfo.initialAmount * currencyCostInfo.initialRate) +
+                                       (currencyCostInfo.acquiredAmount * transaction.price);
+                                        
+      if (currencyCostInfo.totalAmount > 0) {
+        currencyCostInfo.weightedAvgRate = currencyCostInfo.totalCostInBase / currencyCostInfo.totalAmount;
       }
       
-      currencyCostInfo.totalCostInBase = currencyCostInfo.initialAmount * currencyCostInfo.initialRate;
       updatedCostInfo[transaction.currency] = currencyCostInfo;
       
       // تحديث معلومات متوسط التكلفة لليوزد
@@ -466,10 +480,12 @@ export const createCashFlowRecords = (
       // تحديث معلومات متوسط التكلفة للعملة المحلية
       const currencyCostInfo = { ...updatedCostInfo[transaction.currency] };
       currencyCostInfo.totalAmount += transaction.realAmount;
+      
+      // نستخدم الطريقة الأصلية لحساب متوسط تكلفة الدرهم
+      // بما في ذلك الأرباح المتراكمة التي تعكس القيمة الحقيقية
       currencyCostInfo.acquiredAmount += transaction.realAmount;
       
       // تحديث التكلفة الإجمالية للعملة المحلية بناءً على البيع الجديد
-      
       currencyCostInfo.totalCostInBase = (currencyCostInfo.initialAmount * currencyCostInfo.initialRate) +
                                        (currencyCostInfo.acquiredAmount * transaction.price);
                                         

@@ -556,7 +556,7 @@ export const P2PFlowTab: React.FC = () => {
                           return (
                             <li key={`cost-${currency}`}>
                               <span className="font-medium">{currency}: </span>
-                              {costInfo.weightedAvgRate.toFixed(4)} AED/USDT
+                              {costInfo.weightedAvgRate.toFixed(4)} {currency === 'USDT' ? 'AED/USDT' : 'AED/USDT'}
                             </li>
                           );
                         }
