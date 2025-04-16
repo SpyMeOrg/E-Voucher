@@ -95,8 +95,23 @@ export const importExcelFile = async (file: File, returnAllTransactions = false)
         const usdtBefore = parseFloat(row[usdtBeforeColumn] || 0);
         const price = parseFloat(row[priceColumn] || 0);
         const fees = parseFloat(row[feesColumn] || 0);
-        const status = row[statusColumn] || 'COMPLETED';
+        const rawStatus = row[statusColumn] || 'COMPLETED';
         const date = row[dateColumn] || '';
+        
+        // تحديد حالة العملية (COMPLETED, CANCELLED, PENDING)
+        let status: 'COMPLETED' | 'CANCELLED' | 'PENDING';
+        if (typeof rawStatus === 'string') {
+          const normalizedStatus = rawStatus.toString().trim().toUpperCase();
+          if (normalizedStatus.includes('CANCEL') || normalizedStatus.includes('CANCELLED') || normalizedStatus.includes('CANCELED') || normalizedStatus.includes('ملغ')) {
+            status = 'CANCELLED';
+          } else if (normalizedStatus.includes('PEND') || normalizedStatus.includes('PENDING') || normalizedStatus.includes('معلق') || normalizedStatus.includes('قيد')) {
+            status = 'PENDING';
+          } else {
+            status = 'COMPLETED';
+          }
+        } else {
+          status = 'COMPLETED'; // الحالة الافتراضية هي مكتملة
+        }
         
         // تحديد نوع العملية (P2P أو E-Voucher) استناداً فقط لعمود Trade Type
         let tradeType = '';
@@ -183,7 +198,7 @@ export const importExcelFile = async (file: File, returnAllTransactions = false)
           usdt: usdt,
           price: price,
           fees: fees,
-          status: status === 'CANCELLED' ? 'CANCELLED' : 'COMPLETED',
+          status: status,
           date: date,
           tradeType: tradeType,
           source: row[sourceColumn] || ''
@@ -208,6 +223,11 @@ export const importExcelFile = async (file: File, returnAllTransactions = false)
       if (transaction.status === 'CANCELLED' && !returnAllTransactions) {
         console.log(`تجاهل العملية ${transaction.reference} لأنها ملغاة (CANCELLED)`);
         return false;
+      }
+      
+      // العمليات المعلقة (PENDING) تتم معالجتها بشكل خاص، لكن نقبلها في قائمة العمليات الصالحة
+      if (transaction.status === 'PENDING') {
+        console.log(`عملية معلقة: ${transaction.reference}`);
       }
       
       // نتساهل في شرط التاريخ - إذا كان فارغًا نعتبره صالحًا ونضيف تاريخًا افتراضيًا
@@ -251,18 +271,20 @@ export const importExcelFile = async (file: File, returnAllTransactions = false)
     
     console.log(`عدد العمليات بعد التصفية الخفيفة: ${validTransactions.length}`);
 
-    // تصفية نهائية - فقط العمليات المصنفة كـ P2P في عمود Trade Type
+    // تصفية نهائية - فقط العمليات المصنفة كـ P2P في عمود Trade Type والمكتملة (COMPLETED)
     finalFilteredTransactions = validTransactions.filter(transaction => {
       // نقبل فقط العمليات التي نوعها P2P في عمود TradeType إذا لم نكن نريد استرداد جميع العمليات
       if (returnAllTransactions) {
         return true; // إرجاع جميع العمليات
       }
       
+      // تحقق من أن العملية هي P2P وليست معلقة
       const isP2PTransaction = transaction.tradeType === 'P2P';
+      const isCompleted = transaction.status === 'COMPLETED'; // نتأكد أن العملية مكتملة وليست معلقة
       
-      console.log(`تصفية عملية ${transaction.reference}: نوع=${transaction.type}, عملة=${transaction.currency}, نوع_تداول=${transaction.tradeType}, مقبولة=${isP2PTransaction}`);
+      console.log(`تصفية عملية ${transaction.reference}: نوع=${transaction.type}, عملة=${transaction.currency}, نوع_تداول=${transaction.tradeType}, حالة=${transaction.status}, مقبولة=${isP2PTransaction && isCompleted}`);
       
-      return isP2PTransaction;
+      return isP2PTransaction && isCompleted; // قبول فقط P2P المكتملة
     });
 
     console.log(`عدد العمليات النهائية: ${finalFilteredTransactions.length}`);
@@ -302,6 +324,20 @@ export const importExcelFile = async (file: File, returnAllTransactions = false)
     console.log(`- عمليات P2P: ${stats.p2p.total} (${stats.p2p.completed} مكتملة، ${stats.p2p.cancelled} ملغاة)`);
     console.log(`- عمليات E-Voucher: ${stats.evoucher.total} (${stats.evoucher.completed} مكتملة، ${stats.evoucher.cancelled} ملغاة)`);
     console.log(`- عدد العمليات بعد التصفية: ${stats.filtered} (P2P مكتملة فقط)`);
+
+    // استخراج المعاملات المعلقة
+    const pendingTransactions = validTransactions.filter(transaction => 
+      transaction.tradeType === 'P2P' && transaction.status === 'PENDING'
+    );
+
+    // إضافة معلومات المعاملات المعلقة للإحصائيات
+    console.log(`عدد المعاملات المعلقة: ${pendingTransactions.length}`);
+    if (pendingTransactions.length > 0) {
+      console.log('تفاصيل المعاملات المعلقة:');
+      pendingTransactions.forEach(tx => {
+        console.log(`- ${tx.reference}: ${tx.type} ${tx.usdt} USDT مقابل ${tx.realAmount} ${tx.currency}`);
+      });
+    }
 
     return finalFilteredTransactions;
   } catch (error) {
@@ -501,7 +537,12 @@ export const calculateTransactionSummary = (records: CashFlowRecord[]): Transact
     avgBuyPrice: {},
     avgSellPrice: {},
     currentBalances: {},
-    currencyCostInfo: {}
+    currencyCostInfo: {},
+    // إضافة حقول جديدة لتتبع E-Voucher
+    eVoucherStats: {
+      totalUsdtSold: 0,
+      totalTransactions: 0
+    }
   };
 
   // تجميع بيانات العمليات

@@ -18,7 +18,7 @@ export interface P2PTransaction {
   usdt: number;
   price: number;
   fees: number;
-  status: 'COMPLETED' | 'CANCELLED';
+  status: 'COMPLETED' | 'CANCELLED' | 'PENDING';
   date: string;
   tradeType: string;
   source: string;
@@ -63,6 +63,10 @@ export interface TransactionSummary {
   avgSellPrice: { [currency: string]: number };
   currentBalances: { [currency: string]: number };
   currencyCostInfo: { [currency: string]: CurrencyCostInfo };  // معلومات متوسط التكلفة
+  eVoucherStats: {
+    totalUsdtSold: number;     // إجمالي USDT المباعة لمعاملات E-Voucher
+    totalTransactions: number; // عدد معاملات E-Voucher
+  };
 }
 
 export interface EVoucherSummary {

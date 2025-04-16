@@ -139,8 +139,29 @@ export const P2PFlowTab: React.FC = () => {
         return;
       }
       
-      // استيراد كل العمليات بدون تصفية لحساب الإحصائيات
+      // استيراد كل العمليات بدون تصفية لحساب الإحصائيات وإيجاد المعاملات المعلقة
       const allTransactions = await importExcelFile(file, true);
+      
+      // استخراج المعاملات المعلقة
+      const pendingTransactions = allTransactions.filter(t => 
+        t.tradeType === 'P2P' && t.status === 'PENDING'
+      );
+      
+      // استخراج معاملات E-Voucher المكتملة
+      const eVoucherTransactions = allTransactions.filter(t => 
+        t.tradeType === 'E-Voucher' && t.status === 'COMPLETED'
+      );
+      
+      // حساب إجمالي USDT المستخدمة في E-Voucher
+      const totalEVoucherUsdt = eVoucherTransactions
+        .filter(t => t.type === 'Sell')
+        .reduce((sum, t) => sum + t.usdt, 0);
+      
+      console.log(`إجمالي USDT المباعة في E-Voucher: ${totalEVoucherUsdt}`);
+      
+      // حفظ المعاملات المعلقة و E-Voucher في الحالة
+      setPendingTransactions(pendingTransactions);
+      setEVoucherUsdtSold(totalEVoucherUsdt);
       
       // حساب إحصائيات العمليات
       const stats = {
@@ -256,6 +277,9 @@ export const P2PFlowTab: React.FC = () => {
   const [eVoucherSummary, setEVoucherSummary] = useState<EVoucherSummaryType | null>(null);
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const [pendingTransactions, setPendingTransactions] = useState<P2PTransaction[]>([]);
+  const [eVoucherUsdtSold, setEVoucherUsdtSold] = useState<number>(0);
 
   return (
     <div className="container mx-auto p-4 md:p-6 max-w-6xl">
@@ -503,7 +527,20 @@ export const P2PFlowTab: React.FC = () => {
                     <ul className="space-y-2 text-right">
                       {Object.entries(summary.currentBalances).map(([currency, balance]) => (
                         <li key={`balance-${currency}`}>
-                          <span className="font-medium">{formatCurrency(balance, currency)}</span>
+                          {currency === 'USDT' ? (
+                            // خصم قيمة USDT المستخدمة في E-Voucher من الرصيد الفعلي المعروض
+                            <>
+                              <span className="font-medium">{formatCurrency(balance - eVoucherUsdtSold, currency)}</span>
+                              {eVoucherUsdtSold > 0 && (
+                                <div className="text-xs text-gray-500 flex justify-end items-center gap-1">
+                                  <span>({eVoucherUsdtSold.toFixed(4)} USDT تم استخدامها في E-Voucher)</span>
+                                  <span className="text-xs inline-block px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">i</span>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="font-medium">{formatCurrency(balance, currency)}</span>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -564,6 +601,20 @@ export const P2PFlowTab: React.FC = () => {
                               <span className="font-medium">إجمالي مبيعات USDT: </span>
                               {totalSellUsdt.toFixed(4)} USDT مقابل {totalSellAmount.toFixed(4)} AED
                             </li>
+                            {eVoucherUsdtSold > 0 && (
+                              <li>
+                                <span className="font-medium">USDT مستخدمة في E-Voucher: </span>
+                                <span className="text-amber-700">{eVoucherUsdtSold.toFixed(4)} USDT</span>
+                                <span className="text-xs text-gray-500 mr-1">(مخصومة من الرصيد)</span>
+                              </li>
+                            )}
+                            {/* إضافة توضيح للرصيد المتبقي بعد خصم E-Voucher */}
+                            {eVoucherUsdtSold > 0 && summary.currentBalances['USDT'] && (
+                              <li>
+                                <span className="font-medium">صافي رصيد USDT المتبقي: </span>
+                                <span className="text-blue-700">{(summary.currentBalances['USDT'] - eVoucherUsdtSold).toFixed(4)} USDT</span>
+                              </li>
+                            )}
                             {totalSellUsdt > 0 && (
                               <li>
                                 <span className="font-medium">تكلفة USDT المباعة: </span>
@@ -584,6 +635,99 @@ export const P2PFlowTab: React.FC = () => {
                         );
                       })()}
                     </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* قسم المعاملات المعلقة - يظهر فقط عند وجود معاملات معلقة */}
+        {pendingTransactions.length > 0 && summary && (
+          <div className="mb-8 bg-amber-50 p-5 rounded-xl border border-amber-200">
+            <h3 className="text-xl font-semibold mb-4 text-right text-amber-700">معاملات معلقة</h3>
+            <p className="text-amber-700 mb-4 text-right text-sm">
+              هذه المعاملات معلقة ولم تكتمل بعد. تم خصمها من الأرصدة الحالية ولكنها لم تدخل في حسابات الربح/الخسارة.
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* عمليات الشراء المعلقة */}
+              {pendingTransactions.filter(t => t.type === 'Buy').length > 0 && (
+                <div className="bg-white p-4 rounded-lg shadow-sm">
+                  <h4 className="font-medium text-amber-700 mb-2 text-right">مدفوعات معلقة (بانتظار وصول USDT)</h4>
+                  <ul className="space-y-2 text-right">
+                    {pendingTransactions
+                      .filter(t => t.type === 'Buy')
+                      .map((transaction, index) => (
+                        <li key={`pending-buy-${index}`} className="border-b border-amber-100 pb-2">
+                          <div><span className="font-medium">{transaction.reference}</span></div>
+                          <div>
+                            <span className="text-amber-800">تم دفع: </span>
+                            {formatCurrency(transaction.realAmount, transaction.currency)}
+                          </div>
+                          <div>
+                            <span className="text-amber-800">بانتظار: </span>
+                            {formatCurrency(transaction.usdt, 'USDT')}
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* عمليات البيع المعلقة */}
+              {pendingTransactions.filter(t => t.type === 'Sell').length > 0 && (
+                <div className="bg-white p-4 rounded-lg shadow-sm">
+                  <h4 className="font-medium text-amber-700 mb-2 text-right">مبيعات معلقة (بانتظار وصول الأموال للبنك)</h4>
+                  <ul className="space-y-2 text-right">
+                    {pendingTransactions
+                      .filter(t => t.type === 'Sell')
+                      .map((transaction, index) => (
+                        <li key={`pending-sell-${index}`} className="border-b border-amber-100 pb-2">
+                          <div><span className="font-medium">{transaction.reference}</span></div>
+                          <div>
+                            <span className="text-amber-800">تم إرسال: </span>
+                            {formatCurrency(transaction.usdt, 'USDT')}
+                          </div>
+                          <div>
+                            <span className="text-amber-800">بانتظار: </span>
+                            {formatCurrency(transaction.realAmount, transaction.currency)}
+                          </div>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* ملخص إحصائيات المعاملات المعلقة */}
+              <div className="md:col-span-2 bg-white p-4 rounded-lg shadow-sm mt-2">
+                <h4 className="font-medium text-amber-700 mb-2 text-right">تأثير المعاملات المعلقة على الأرصدة</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h5 className="font-medium text-right text-amber-600 mb-1">أموال معلقة (خرجت من البنك)</h5>
+                    {Object.entries(
+                      pendingTransactions
+                        .filter(t => t.type === 'Buy')
+                        .reduce((acc, t) => {
+                          acc[t.currency] = (acc[t.currency] || 0) + t.realAmount;
+                          return acc;
+                        }, {} as {[currency: string]: number})
+                    ).map(([currency, amount]) => (
+                      <div key={`pending-out-${currency}`} className="text-right">
+                        <span className="font-medium">{currency}: </span>
+                        {amount.toFixed(4)}
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <h5 className="font-medium text-right text-amber-600 mb-1">USDT معلقة (خرجت من المنصة)</h5>
+                    <div className="text-right">
+                      <span className="font-medium">USDT: </span>
+                      {pendingTransactions
+                        .filter(t => t.type === 'Sell')
+                        .reduce((sum, t) => sum + t.usdt, 0)
+                        .toFixed(4)}
+                    </div>
                   </div>
                 </div>
               </div>
