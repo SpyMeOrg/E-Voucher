@@ -570,7 +570,7 @@ export const P2PFlowTab: React.FC = () => {
                     <h4 className="font-medium text-purple-700 mb-2 text-right">الربح / الخسارة</h4>
                     <ul className="space-y-2 text-right">
                       {(() => {
-                        // حساب الربح الفعلي من عمليات البيع والشراء
+                        // حساب الربح الفعلي من عمليات البيع والشراء بطريقة محسنة
                         let totalBuyAmount = 0;  // إجمالي ما تم دفعه للشراء بالدرهم
                         let totalSellAmount = 0; // إجمالي ما تم استلامه من البيع بالدرهم
                         
@@ -587,9 +587,26 @@ export const P2PFlowTab: React.FC = () => {
                           totalSellAmount = summary.totalSell['AED'];
                         }
                         
+                        // الحصول على متوسط سعر التكلفة المرجح لليوزد
+                        let weightedAvgUsdtRate = summary.currencyCostInfo['USDT']?.weightedAvgRate || 3.67;
+                        
+                        // التأكد من أن سعر التكلفة منطقي
+                        if (weightedAvgUsdtRate < 3 || weightedAvgUsdtRate > 5) {
+                          // استخدام متوسط سعر الشراء المحسوب من الإجماليات
+                          weightedAvgUsdtRate = totalBuyAmount / totalBuyUsdt;
+                          
+                          // إذا كان لا يزال خارج النطاق المنطقي، استخدم القيمة الافتراضية
+                          if (isNaN(weightedAvgUsdtRate) || weightedAvgUsdtRate < 3 || weightedAvgUsdtRate > 5) {
+                            weightedAvgUsdtRate = 3.67;
+                          }
+                        }
+                        
+                        // حساب تكلفة الـ USDT المباعة بشكل أدق
+                        const soldUsdtCost = totalSellUsdt * weightedAvgUsdtRate;
+                        
                         // حساب الربح الفعلي بالدرهم
-                        // الربح الفعلي = (مبلغ البيع) - (كمية USDT المباعة * متوسط تكلفة شراء الوحدة)
-                        const actualProfit = totalSellAmount - (totalSellUsdt * (totalBuyAmount / totalBuyUsdt));
+                        // الربح الفعلي = (مبلغ البيع) - (تكلفة USDT المباعة)
+                        const actualProfit = totalSellAmount - soldUsdtCost;
                         
                         return (
                           <>
@@ -618,7 +635,10 @@ export const P2PFlowTab: React.FC = () => {
                             {totalSellUsdt > 0 && (
                               <li>
                                 <span className="font-medium">تكلفة USDT المباعة: </span>
-                                {((totalBuyAmount / totalBuyUsdt) * totalSellUsdt).toFixed(4)} AED
+                                {soldUsdtCost.toFixed(4)} AED 
+                                <span className="text-xs text-gray-500 mr-1">
+                                  (بمتوسط تكلفة {weightedAvgUsdtRate.toFixed(4)} AED/USDT)
+                                </span>
                               </li>
                             )}
                             {totalSellUsdt > 0 && (
