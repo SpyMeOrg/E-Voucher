@@ -570,7 +570,7 @@ export const P2PFlowTab: React.FC = () => {
                     <h4 className="font-medium text-purple-700 mb-2 text-right">الربح / الخسارة</h4>
                     <ul className="space-y-2 text-right">
                       {(() => {
-                        // حساب الربح الفعلي من عمليات البيع والشراء بطريقة محسنة
+                        // حساب الربح الفعلي من عمليات البيع والشراء
                         let totalBuyAmount = 0;  // إجمالي ما تم دفعه للشراء بالدرهم
                         let totalSellAmount = 0; // إجمالي ما تم استلامه من البيع بالدرهم
                         
@@ -587,26 +587,9 @@ export const P2PFlowTab: React.FC = () => {
                           totalSellAmount = summary.totalSell['AED'];
                         }
                         
-                        // الحصول على متوسط سعر التكلفة المرجح لليوزد
-                        let weightedAvgUsdtRate = summary.currencyCostInfo['USDT']?.weightedAvgRate || 3.67;
-                        
-                        // التأكد من أن سعر التكلفة منطقي
-                        if (weightedAvgUsdtRate < 3 || weightedAvgUsdtRate > 5) {
-                          // استخدام متوسط سعر الشراء المحسوب من الإجماليات
-                          weightedAvgUsdtRate = totalBuyAmount / totalBuyUsdt;
-                          
-                          // إذا كان لا يزال خارج النطاق المنطقي، استخدم القيمة الافتراضية
-                          if (isNaN(weightedAvgUsdtRate) || weightedAvgUsdtRate < 3 || weightedAvgUsdtRate > 5) {
-                            weightedAvgUsdtRate = 3.67;
-                          }
-                        }
-                        
-                        // حساب تكلفة الـ USDT المباعة بشكل أدق
-                        const soldUsdtCost = totalSellUsdt * weightedAvgUsdtRate;
-                        
                         // حساب الربح الفعلي بالدرهم
-                        // الربح الفعلي = (مبلغ البيع) - (تكلفة USDT المباعة)
-                        const actualProfit = totalSellAmount - soldUsdtCost;
+                        // الربح الفعلي = (مبلغ البيع) - (كمية USDT المباعة * متوسط تكلفة شراء الوحدة)
+                        const actualProfit = totalSellAmount - (totalSellUsdt * (totalBuyAmount / totalBuyUsdt));
                         
                         return (
                           <>
@@ -635,10 +618,7 @@ export const P2PFlowTab: React.FC = () => {
                             {totalSellUsdt > 0 && (
                               <li>
                                 <span className="font-medium">تكلفة USDT المباعة: </span>
-                                {soldUsdtCost.toFixed(4)} AED 
-                                <span className="text-xs text-gray-500 mr-1">
-                                  (بمتوسط تكلفة {weightedAvgUsdtRate.toFixed(4)} AED/USDT)
-                                </span>
+                                {((totalBuyAmount / totalBuyUsdt) * totalSellUsdt).toFixed(4)} AED
                               </li>
                             )}
                             {totalSellUsdt > 0 && (
@@ -776,6 +756,9 @@ export const P2PFlowTab: React.FC = () => {
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       الأرصدة
                     </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      متوسط التكلفة
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -804,6 +787,22 @@ export const P2PFlowTab: React.FC = () => {
                               {formatCurrency(balance, currency)}
                             </li>
                           ))}
+                        </ul>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                        <ul className="space-y-1">
+                          {record.costInfo && Object.entries(record.costInfo).map(([currency, info]) => {
+                            // عرض متوسط التكلفة للعملات التي لها رصيد
+                            if (record.balances[currency] > 0) {
+                              return (
+                                <li key={`cost-${record.id}-${currency}`} className={currency === 'USDT' ? 'text-blue-600' : 'text-purple-600'}>
+                                  <span className="font-medium">{currency}: </span>
+                                  {info.weightedAvgRate.toFixed(4)} {currency === 'USDT' ? 'AED/USDT' : 'AED/USDT'}
+                                </li>
+                              );
+                            }
+                            return null;
+                          })}
                         </ul>
                       </td>
                     </tr>
