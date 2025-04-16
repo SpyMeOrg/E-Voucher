@@ -360,8 +360,11 @@ export const createCashFlowRecords = (
   
   // تهيئة معلومات متوسط التكلفة بطريقة أكثر دقة
   Object.keys(initialBalances).forEach(currency => {
-    // القيمة الافتراضية لمعدل الصرف هي 3.67 لليوزد و 1 لباقي العملات
-    const initialRate = initialRates[currency] || (currency === 'USDT' ? 3.67 : 1);
+    // القيمة الافتراضية لمعدل الصرف هي 3.67 للجميع
+    const defaultRate = 3.67;
+    
+    // استخدام السعر الأولي المعطى أو القيمة الافتراضية
+    const initialRate = initialRates[currency] || defaultRate;
     
     // تأكد من معالجة الرصيد الأولي بشكل صحيح
     const initialAmount = initialBalances[currency] || 0;
@@ -435,18 +438,36 @@ export const createCashFlowRecords = (
       
       // تحديث معلومات متوسط التكلفة للعملة المحلية
       const currencyCostInfo = { ...updatedCostInfo[transaction.currency] };
-      currencyCostInfo.totalAmount += transaction.realAmount;
+      currencyCostInfo.totalAmount = currentBalances[transaction.currency]; // تحديث الكمية لتطابق الرصيد الحالي
       
-      // نستخدم الطريقة الأصلية لحساب متوسط تكلفة الدرهم
-      // بما في ذلك الأرباح المتراكمة التي تعكس القيمة الحقيقية
-      currencyCostInfo.acquiredAmount += transaction.realAmount;
-      
-      // تحديث التكلفة الإجمالية للعملة المحلية بناءً على البيع الجديد
-      currencyCostInfo.totalCostInBase = (currencyCostInfo.initialAmount * currencyCostInfo.initialRate) +
-                                       (currencyCostInfo.acquiredAmount * transaction.price);
-                                        
-      if (currencyCostInfo.totalAmount > 0) {
-        currencyCostInfo.weightedAvgRate = currencyCostInfo.totalCostInBase / currencyCostInfo.totalAmount;
+      // تعديل خاص للدرهم AED: نحافظ على متوسط سعره متوافق مع USDT
+      if (transaction.currency === 'AED') {
+        // حساب متوسط سعر الشراء الجديد لـ USDT
+        const usdtCostInfo = { ...updatedCostInfo['USDT'] };
+        const prevUsdtTotal = usdtCostInfo.totalAmount;
+        const prevUsdtCost = usdtCostInfo.totalCostInBase;
+        
+        // محاكاة متوسط USDT الجديد
+        const newUsdtTotal = prevUsdtTotal + transaction.usdt;
+        const newUsdtCost = prevUsdtCost + transaction.realAmount;
+        const newAvgRate = newUsdtCost / newUsdtTotal;
+        
+        // تطبيق نفس المتوسط على AED
+        currencyCostInfo.weightedAvgRate = newAvgRate;
+        currencyCostInfo.totalCostInBase = currencyCostInfo.totalAmount * newAvgRate;
+        
+        console.log(`تحديث متوسط سعر AED (شراء): ${newAvgRate}`);
+      } 
+      else {
+        // العملات الأخرى تستخدم المعادلة الأصلية
+        // تحسين حساب التكلفة الإجمالية للعملة المحلية
+        // نحافظ على نسبة التكلفة بين المبلغ الأولي والمبلغ المتبقي
+        if (currencyCostInfo.totalAmount < currencyCostInfo.initialAmount) {
+          // إذا كان المبلغ المتبقي أقل من المبلغ الأولي، نقلل قيمة المبلغ الأصلي
+          currencyCostInfo.initialAmount = currencyCostInfo.totalAmount;
+        }
+        
+        currencyCostInfo.totalCostInBase = currencyCostInfo.initialAmount * currencyCostInfo.initialRate;
       }
       
       updatedCostInfo[transaction.currency] = currencyCostInfo;
@@ -476,20 +497,33 @@ export const createCashFlowRecords = (
       currentBalances[transaction.currency] += transaction.realAmount;
       currentBalances.USDT -= transaction.usdt;
       
-      // تحديث معلومات متوسط التكلفة للعملة المحلية
+      // تحديث معلومات متوسط التكلفة للعملة المحلية (تصحيح لعملة AED)
       const currencyCostInfo = { ...updatedCostInfo[transaction.currency] };
       currencyCostInfo.totalAmount += transaction.realAmount;
       
-      // نستخدم الطريقة الأصلية لحساب متوسط تكلفة الدرهم
-      // بما في ذلك الأرباح المتراكمة التي تعكس القيمة الحقيقية
-      currencyCostInfo.acquiredAmount += transaction.realAmount;
+      // استخدام معادلة مختلفة لعملة AED
+      if (transaction.currency === 'AED') {
+        // نحسب متوسط سعر تكلفة الدرهم بناءً على قيمة USDT المباعة وسعر الشراء المتوسط
+        const usdtCostInfo = updatedCostInfo['USDT'];
+        const averageUsdtCost = usdtCostInfo.weightedAvgRate;
+        
+        // نستخدم نفس المتوسط للدرهم
+        currencyCostInfo.weightedAvgRate = averageUsdtCost;
+        
+        // حساب التكلفة الإجمالية بناءً على متوسط السعر
+        currencyCostInfo.totalCostInBase = currencyCostInfo.totalAmount * averageUsdtCost;
+      }
+      else {
+        // العملات الأخرى تستخدم الطريقة الحالية
+        currencyCostInfo.acquiredAmount += transaction.realAmount;
       
-      // تحديث التكلفة الإجمالية للعملة المحلية بناءً على البيع الجديد
-      currencyCostInfo.totalCostInBase = (currencyCostInfo.initialAmount * currencyCostInfo.initialRate) +
-                                       (currencyCostInfo.acquiredAmount * transaction.price);
-                                        
-      if (currencyCostInfo.totalAmount > 0) {
-        currencyCostInfo.weightedAvgRate = currencyCostInfo.totalCostInBase / currencyCostInfo.totalAmount;
+        // تحديث التكلفة الإجمالية للعملة المحلية بناءً على البيع الجديد
+        currencyCostInfo.totalCostInBase = (currencyCostInfo.initialAmount * currencyCostInfo.initialRate) +
+                                         (currencyCostInfo.acquiredAmount * transaction.price);
+                                          
+        if (currencyCostInfo.totalAmount > 0) {
+          currencyCostInfo.weightedAvgRate = currencyCostInfo.totalCostInBase / currencyCostInfo.totalAmount;
+        }
       }
       
       updatedCostInfo[transaction.currency] = currencyCostInfo;
