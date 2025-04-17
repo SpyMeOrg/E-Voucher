@@ -239,8 +239,24 @@ export const P2PFlowTab: React.FC = () => {
     }
     
     try {
-      const workbook = exportCashFlowToExcel(cashFlowRecords);
-      writeFile(workbook, 'سجل_التدفق_النقدي.xlsx');
+      // تمرير ملخص البيانات مع سجل التدفق النقدي
+      const workbook = exportCashFlowToExcel(cashFlowRecords, {
+        eVoucherUsdtSold: eVoucherUsdtSold,
+        summary: summary
+      });
+      
+      // اسم الملف بتاريخ اليوم
+      const today = new Date();
+      const dateStr = `${today.getDate()}-${today.getMonth()+1}-${today.getFullYear()}`;
+      writeFile(workbook, `سجل_التدفق_النقدي_${dateStr}.xlsx`);
+      
+      // عرض رسالة نجاح
+      setSuccessMessage('تم تصدير سجل التدفق النقدي والملخصات بنجاح');
+      
+      // إخفاء رسالة النجاح بعد 3 ثوان
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 3000);
     } catch (error) {
       setError('حدث خطأ أثناء تصدير البيانات');
     }

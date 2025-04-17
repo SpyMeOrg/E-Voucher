@@ -620,7 +620,10 @@ export const calculateTransactionSummary = (records: CashFlowRecord[]): Transact
 };
 
 // تصدير سجل التدفق النقدي إلى Excel
-export const exportCashFlowToExcel = (records: CashFlowRecord[]): WorkBook => {
+export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: { 
+  eVoucherUsdtSold?: number, 
+  summary?: TransactionSummary
+}): WorkBook => {
   // تحويل السجلات إلى تنسيق مناسب للتصدير
   const exportData = records.map(record => {
     // استخراج أرصدة العملات
@@ -643,6 +646,81 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[]): WorkBook => {
       ...balancesData
     };
   });
+  
+  // إضافة صف فارغ للفصل
+  if (exportData.length > 0 && summaryData) {
+    const emptyRow = {
+      'Date': '',
+      'Type': '',
+      'Currency': '',
+      'Amount': '',
+      'USDT Amount': '',
+      'Price': '',
+      'Description': '',
+    };
+    
+    // إضافة صف فاصل
+    exportData.push(emptyRow);
+    
+    // إضافة صف ملخص E-Voucher
+    if (summaryData.eVoucherUsdtSold) {
+      const eVoucherRow = {
+        'Date': new Date().toLocaleString('en-US'),
+        'Type': 'Summary',
+        'Currency': '',
+        'Amount': '',
+        'USDT Amount': summaryData.eVoucherUsdtSold.toFixed(4),
+        'Price': '',
+        'Description': `E-Voucher Operations: ${summaryData.eVoucherUsdtSold.toFixed(4)} USDT used in E-Voucher transactions`,
+        'Balance USDT': summaryData.summary?.currentBalances?.USDT ? 
+          (summaryData.summary.currentBalances.USDT - summaryData.eVoucherUsdtSold).toFixed(4) :
+          '',
+        'Balance AED': summaryData.summary?.currentBalances?.AED ? 
+          summaryData.summary.currentBalances.AED.toFixed(4) :
+          ''
+      };
+      exportData.push(eVoucherRow);
+    }
+    
+    // إضافة صف ملخص الأرصدة الحالية
+    if (summaryData.summary) {
+      // صف الأرصدة النهائية
+      const balanceRow = {
+        'Date': new Date().toLocaleString('en-US'),
+        'Type': 'Summary',
+        'Currency': '',
+        'Amount': '',
+        'USDT Amount': '',
+        'Price': '',
+        'Description': 'Final Balances after all operations (including E-Voucher deductions)',
+        'Balance USDT': summaryData.summary.currentBalances.USDT ? 
+          (summaryData.summary.currentBalances.USDT - (summaryData.eVoucherUsdtSold || 0)).toFixed(4) :
+          '',
+        'Balance AED': summaryData.summary.currentBalances.AED ? 
+          summaryData.summary.currentBalances.AED.toFixed(4) :
+          ''
+      };
+      exportData.push(balanceRow);
+      
+      // صف الربح الفعلي
+      if (summaryData.summary.totalSellUsdt > 0 && summaryData.summary.totalBuyUsdt > 0) {
+        const totalBuyAmount = summaryData.summary.totalBuy['AED'] || 0;
+        const totalSellAmount = summaryData.summary.totalSell['AED'] || 0;
+        const actualProfit = totalSellAmount - ((summaryData.summary.totalSellUsdt * totalBuyAmount) / summaryData.summary.totalBuyUsdt);
+        
+        const profitRow = {
+          'Date': new Date().toLocaleString('en-US'),
+          'Type': 'Summary',
+          'Currency': 'AED',
+          'Amount': Math.abs(actualProfit).toFixed(4),
+          'USDT Amount': '',
+          'Price': '',
+          'Description': `P2P Trading Profit: ${Math.abs(actualProfit).toFixed(4)} AED`,
+        };
+        exportData.push(profitRow);
+      }
+    }
+  }
 
   // إنشاء ورقة عمل جديدة
   const worksheet = utils.json_to_sheet(exportData);
