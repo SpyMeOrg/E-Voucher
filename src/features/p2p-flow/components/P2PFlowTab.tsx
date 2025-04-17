@@ -756,9 +756,6 @@ export const P2PFlowTab: React.FC = () => {
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       الأرصدة
                     </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      متوسط التكلفة
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -787,22 +784,6 @@ export const P2PFlowTab: React.FC = () => {
                               {formatCurrency(balance, currency)}
                             </li>
                           ))}
-                        </ul>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 text-right">
-                        <ul className="space-y-1">
-                          {record.costInfo && Object.entries(record.costInfo).map(([currency, info]) => {
-                            // عرض متوسط التكلفة للعملات التي لها رصيد
-                            if (record.balances[currency] > 0) {
-                              return (
-                                <li key={`cost-${record.id}-${currency}`} className={currency === 'USDT' ? 'text-blue-600' : 'text-purple-600'}>
-                                  <span className="font-medium">{currency}: </span>
-                                  {info.weightedAvgRate.toFixed(4)} {currency === 'USDT' ? 'AED/USDT' : 'AED/USDT'}
-                                </li>
-                              );
-                            }
-                            return null;
-                          })}
                         </ul>
                       </td>
                     </tr>
