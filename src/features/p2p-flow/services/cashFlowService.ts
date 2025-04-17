@@ -706,6 +706,8 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
       if (summaryData.summary.totalSellUsdt > 0 && summaryData.summary.totalBuyUsdt > 0) {
         const totalBuyAmount = summaryData.summary.totalBuy['AED'] || 0;
         const totalSellAmount = summaryData.summary.totalSell['AED'] || 0;
+        
+        // حساب الربح الفعلي من البيانات المتاحة
         const actualProfit = totalSellAmount - ((summaryData.summary.totalSellUsdt * totalBuyAmount) / summaryData.summary.totalBuyUsdt);
         
         const profitRow = {

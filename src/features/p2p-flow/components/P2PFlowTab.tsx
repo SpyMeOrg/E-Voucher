@@ -242,7 +242,7 @@ export const P2PFlowTab: React.FC = () => {
       // تمرير ملخص البيانات مع سجل التدفق النقدي
       const workbook = exportCashFlowToExcel(cashFlowRecords, {
         eVoucherUsdtSold: eVoucherUsdtSold,
-        summary: summary
+        summary: summary || undefined
       });
       
       // اسم الملف بتاريخ اليوم
