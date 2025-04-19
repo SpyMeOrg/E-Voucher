@@ -674,7 +674,7 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
     exportData.push({
       'Date': new Date().toLocaleString('en-US'),
       'Reference': '',
-      'Type': 'Summary',
+      'Type': 'Buy',
       'Currency': '',
       'Amount': '',
       'USDT Amount': summaryData.summary.totalBuyUsdt.toFixed(4),
@@ -685,7 +685,7 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
     exportData.push({
       'Date': new Date().toLocaleString('en-US'),
       'Reference': '',
-      'Type': 'Summary',
+      'Type': 'Sell',
       'Currency': '',
       'Amount': '',
       'USDT Amount': summaryData.summary.totalSellUsdt.toFixed(4),
@@ -698,7 +698,7 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
       exportData.push({
         'Date': new Date().toLocaleString('en-US'),
         'Reference': '',
-        'Type': 'Summary',
+        'Type': 'Sell',
         'Currency': '',
         'Amount': '',
         'USDT Amount': summaryData.eVoucherUsdtSold.toFixed(4),
@@ -722,7 +722,7 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
       exportData.push({
         'Date': new Date().toLocaleString('en-US'),
         'Reference': '',
-        'Type': 'Balance',
+        'Type': 'Buy',
         'Currency': currency,
         'Amount': displayBalance.toFixed(4),
         'USDT Amount': '',
@@ -735,7 +735,7 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
         exportData.push({
           'Date': new Date().toLocaleString('en-US'),
           'Reference': '',
-          'Type': 'Info',
+          'Type': 'Sell',
           'Currency': currency,
           'Amount': summaryData.eVoucherUsdtSold.toFixed(4),
           'USDT Amount': '',
@@ -747,7 +747,7 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
         exportData.push({
           'Date': new Date().toLocaleString('en-US'),
           'Reference': '',
-          'Type': 'Info',
+          'Type': 'Buy',
           'Currency': currency,
           'Amount': balance.toFixed(4),
           'USDT Amount': '',
@@ -769,7 +769,7 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
       exportData.push({
         'Date': new Date().toLocaleString('en-US'),
         'Reference': '',
-        'Type': 'Profit',
+        'Type': 'Sell',
         'Currency': 'AED',
         'Amount': Math.abs(actualProfit).toFixed(4),
         'USDT Amount': '',
@@ -810,18 +810,31 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
   
   // ====================== ورقة المعاملات المعلقة ======================
   if (summaryData?.pendingTransactions && summaryData.pendingTransactions.length > 0) {
+    // تعريف واجهة لبيانات التصدير (لحل مشكلة الأنواع)
+    interface PendingExportData {
+      'Date': string;
+      'Reference': string;
+      'Type': string;
+      'Status': string;
+      'Currency': string;
+      'Amount': string;
+      'USDT': string;
+      'Price': string;
+      'Description': string;
+    }
+    
     // تحويل المعاملات المعلقة إلى تنسيق مناسب للتصدير
-    const pendingData = summaryData.pendingTransactions.map(tx => {
+    const pendingData: PendingExportData[] = summaryData.pendingTransactions.map(tx => {
       return {
         'Date': new Date(tx.date).toLocaleString('en-US'),
-        'Reference': tx.id,
+        'Reference': tx.reference,
         'Type': tx.type === 'Buy' ? 'Buy' : 'Sell',
-        'Status': 'Pending',
+        'Status': 'PENDING',
         'Currency': tx.currency,
         'Amount': tx.amount.toFixed(4),
         'USDT': tx.usdt.toFixed(4),
         'Price': tx.price.toFixed(4),
-        'Description': tx.description || ''
+        'Description': tx.source || ''
       };
     });
     
@@ -848,11 +861,11 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
       });
       
       // صف فارغ
-      const emptyRow = {
+      const emptyRow: PendingExportData = {
         'Date': '',
         'Reference': '',
-        'Type': '',
-        'Status': '',
+        'Type': 'Buy',
+        'Status': 'PENDING',
         'Currency': '',
         'Amount': '',
         'USDT': '',
@@ -867,8 +880,8 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
         pendingData.push({
           'Date': new Date().toLocaleString('en-US'),
           'Reference': '',
-          'Type': 'Summary',
-          'Status': '',
+          'Type': 'Buy',
+          'Status': 'PENDING',
           'Currency': '',
           'Amount': '',
           'USDT': pendingSummary.totalBuyUsdt.toFixed(4),
@@ -881,8 +894,8 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
           pendingData.push({
             'Date': new Date().toLocaleString('en-US'),
             'Reference': '',
-            'Type': 'Summary',
-            'Status': '',
+            'Type': 'Buy',
+            'Status': 'PENDING',
             'Currency': currency,
             'Amount': amount.toFixed(4),
             'USDT': '',
@@ -899,8 +912,8 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
         pendingData.push({
           'Date': new Date().toLocaleString('en-US'),
           'Reference': '',
-          'Type': 'Summary',
-          'Status': '',
+          'Type': 'Sell',
+          'Status': 'PENDING',
           'Currency': '',
           'Amount': '',
           'USDT': pendingSummary.totalSellUsdt.toFixed(4),
@@ -913,8 +926,8 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
           pendingData.push({
             'Date': new Date().toLocaleString('en-US'),
             'Reference': '',
-            'Type': 'Summary',
-            'Status': '',
+            'Type': 'Sell',
+            'Status': 'PENDING',
             'Currency': currency,
             'Amount': amount.toFixed(4),
             'USDT': '',
@@ -956,42 +969,62 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
   
   // ====================== ورقة معاملات E-Voucher ======================
   if (summaryData?.eVoucherTransactions && summaryData.eVoucherTransactions.length > 0) {
+    // تعريف واجهة لبيانات التصدير (لحل مشكلة الأنواع)
+    interface EVoucherExportData {
+      'Date': string;
+      'Reference': string;
+      'Type': string;
+      'Status': string;
+      'Currency': string;
+      'Amount': string;
+      'USDT': string;
+      'Price': string;
+      'Description': string;
+    }
+    
     // تحويل معاملات E-Voucher إلى تنسيق مناسب للتصدير
-    const eVoucherData = summaryData.eVoucherTransactions.map(tx => {
+    const eVoucherData: EVoucherExportData[] = summaryData.eVoucherTransactions.map(tx => {
+      // تحديد الحالة بشكل صحيح (COMPLETED أو CANCELLED أو PENDING)
+      const status = tx.status === 'COMPLETED' ? 'COMPLETED' : 
+                    tx.status === 'CANCELLED' ? 'CANCELLED' : 
+                    tx.status === 'PENDING' ? 'PENDING' : 'COMPLETED';
+      
       return {
         'Date': new Date(tx.date).toLocaleString('en-US'),
-        'Reference': tx.id,
-        'Type': tx.type,
-        'Status': tx.status || 'Completed',
+        'Reference': tx.reference,
+        'Type': tx.type === 'Buy' ? 'Buy' : 'Sell',
+        'Status': status,
         'Currency': tx.currency,
         'Amount': tx.amount.toFixed(4),
         'USDT': tx.usdt.toFixed(4),
         'Price': tx.price.toFixed(4),
-        'Description': tx.description || ''
+        'Description': tx.source || ''
       };
     });
     
     // إضافة ملخص E-Voucher
     if (summaryData.eVoucherSummary && eVoucherData.length > 0) {
       // صف فارغ
-      eVoucherData.push({
+      const emptyRow: EVoucherExportData = {
         'Date': '',
         'Reference': '',
-        'Type': '',
-        'Status': '',
+        'Type': 'Buy',
+        'Status': 'COMPLETED',
         'Currency': '',
         'Amount': '',
         'USDT': '',
         'Price': '',
         'Description': ''
-      });
+      };
+      
+      eVoucherData.push(emptyRow);
       
       // إجماليات E-Voucher
       eVoucherData.push({
         'Date': new Date().toLocaleString('en-US'),
         'Reference': '',
-        'Type': 'Summary',
-        'Status': '',
+        'Type': 'Buy',
+        'Status': 'COMPLETED',
         'Currency': 'EGP',
         'Amount': summaryData.eVoucherSummary.totalEGP.toFixed(4),
         'USDT': '',
@@ -1002,8 +1035,8 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
       eVoucherData.push({
         'Date': new Date().toLocaleString('en-US'),
         'Reference': '',
-        'Type': 'Summary',
-        'Status': '',
+        'Type': 'Buy',
+        'Status': 'COMPLETED',
         'Currency': 'AED',
         'Amount': summaryData.eVoucherSummary.totalAED.toFixed(4),
         'USDT': '',
@@ -1014,8 +1047,8 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
       eVoucherData.push({
         'Date': new Date().toLocaleString('en-US'),
         'Reference': '',
-        'Type': 'Summary',
-        'Status': '',
+        'Type': 'Sell',
+        'Status': 'COMPLETED',
         'Currency': 'USDT',
         'Amount': '',
         'USDT': summaryData.eVoucherSummary.totalUSDT.toFixed(4),
@@ -1027,8 +1060,8 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
       eVoucherData.push({
         'Date': new Date().toLocaleString('en-US'),
         'Reference': '',
-        'Type': 'Averages',
-        'Status': '',
+        'Type': 'Buy',
+        'Status': 'COMPLETED',
         'Currency': '',
         'Amount': '',
         'USDT': '',
@@ -1039,8 +1072,8 @@ export const exportCashFlowToExcel = (records: CashFlowRecord[], summaryData?: {
       eVoucherData.push({
         'Date': new Date().toLocaleString('en-US'),
         'Reference': '',
-        'Type': 'Averages',
-        'Status': '',
+        'Type': 'Buy',
+        'Status': 'COMPLETED',
         'Currency': '',
         'Amount': '',
         'USDT': '',
