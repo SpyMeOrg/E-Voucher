@@ -126,6 +126,9 @@ export const P2PFlowTab: React.FC = () => {
       setLoading(true);
       setError(null);
       
+      // حفظ اسم الملف للعرض في العنوان
+      setImportedFileName(file.name);
+      
       console.log('بدء استيراد الملف:', file.name);
       
       // استيراد عمليات P2P
@@ -239,10 +242,14 @@ export const P2PFlowTab: React.FC = () => {
     }
     
     try {
-      // تمرير ملخص البيانات مع سجل التدفق النقدي
+      // تمرير ملخص البيانات مع سجل التدفق النقدي وكل أنواع المعاملات
       const workbook = exportCashFlowToExcel(cashFlowRecords, {
         eVoucherUsdtSold: eVoucherUsdtSold,
-        summary: summary || undefined
+        summary: summary || undefined,
+        pendingTransactions: pendingTransactions.length > 0 ? pendingTransactions : undefined,
+        eVoucherSummary: eVoucherSummary || undefined,
+        // استخراج معاملات E-Voucher
+        eVoucherTransactions: transactions.filter(tx => tx.tradeType === 'E-Voucher')
       });
       
       // اسم الملف بتاريخ اليوم
@@ -262,6 +269,57 @@ export const P2PFlowTab: React.FC = () => {
     }
   };
 
+  // تصدير رصيد الإغلاق لليوم التالي
+  const handleExportClosingBalance = () => {
+    if (!summary || !summary.currentBalances) {
+      setError('لا توجد أرصدة حالية للتصدير');
+      return;
+    }
+
+    // إنشاء أرصدة بنكية جديدة من الأرصدة الحالية
+    const newBankBalances: BankBalance[] = [];
+    Object.entries(summary.currentBalances).forEach(([currency, balance]) => {
+      // تجاهل USDT لأنه سيتم التعامل معه بشكل منفصل
+      if (currency !== 'USDT') {
+        // إضافة الرصيد مع معدل الصرف الحالي
+        const weightedAvgRate = summary.currencyCostInfo[currency]?.weightedAvgRate || 0;
+        newBankBalances.push({
+          currency,
+          amount: balance,
+          initialRate: weightedAvgRate
+        });
+      }
+    });
+
+    // حساب رصيد USDT النهائي بعد خصم E-Voucher
+    const finalUsdtBalance = summary.currentBalances['USDT'] - eVoucherUsdtSold;
+    const usdtWeightedAvgRate = summary.currencyCostInfo['USDT']?.weightedAvgRate || 3.67;
+
+    // تصفير الصفحة وتحديث الأرصدة الجديدة
+    setTransactions([]);
+    setCashFlowRecords([]);
+    setSummary(null);
+    setError(null);
+    setImportedFileName(null);
+    setEVoucherSummary(null);
+    setEVoucherUsdtSold(0);
+    setPendingTransactions([]);
+    setSuccessMessage(null);
+
+    // تعيين الأرصدة الافتتاحية الجديدة
+    setInitialBalances(newBankBalances);
+    setInitialUsdtBalance(finalUsdtBalance);
+    setInitialUsdtRate(usdtWeightedAvgRate);
+
+    // تنظيف حقل الملف
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    // إظهار رسالة نجاح
+    setSuccessMessage('تم تصفير الصفحة وتحديث الأرصدة الافتتاحية بنجاح');
+  };
+
   // مسح البيانات المدخلة وتصفير التبويب
   const handleClearData = () => {
     if (window.confirm('هل أنت متأكد من مسح جميع البيانات؟')) {
@@ -272,6 +330,7 @@ export const P2PFlowTab: React.FC = () => {
       setCashFlowRecords([]);
       setSummary(null);
       setError(null);
+      setImportedFileName(null);
       
       // تنظيف التخزين المحلي الخاص بالتبويب إذا كنت ترغب
       localStorage.removeItem('p2pFlowInitialBalances');
@@ -285,13 +344,19 @@ export const P2PFlowTab: React.FC = () => {
     }
   };
 
-  // تنسيق القيمة المالية للعرض
+  // تنسيق القيمة المالية للعرض بدقة أكبر
   const formatCurrency = (value: number, currency: string) => {
+    // للعملات المحلية، نستخدم تقريب بأكثر دقة قبل التقريب النهائي للعرض
+    if (currency === 'AED') {
+      // نحل مشكلة التقريب بإضافة قليل من الدقة (0.0001) لتجنب الفروقات الناتجة عن حسابات الحاسوب للأرقام العشرية
+      const preciseValue = Math.round((value + 0.0001) * 10000) / 10000;
+      return `${preciseValue.toFixed(4)} ${currency}`;
+    }
     return `${value.toFixed(4)} ${currency}`;
   };
 
   const [eVoucherSummary, setEVoucherSummary] = useState<EVoucherSummaryType | null>(null);
-
+  const [importedFileName, setImportedFileName] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [pendingTransactions, setPendingTransactions] = useState<P2PTransaction[]>([]);
@@ -453,6 +518,18 @@ export const P2PFlowTab: React.FC = () => {
               </svg>
               تصدير سجل التدفق النقدي
             </button>
+
+            {summary && summary.currentBalances && (
+              <button
+                onClick={handleExportClosingBalance}
+                className="inline-flex items-center justify-center px-6 py-3.5 text-sm font-medium transition-all duration-200 rounded-xl shadow-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:shadow-lg hover:shadow-indigo-100/50 border border-indigo-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                تصدير رصيد الإغلاق لليوم التالي
+              </button>
+            )}
             
             <button
               onClick={handleClearData}
@@ -481,7 +558,14 @@ export const P2PFlowTab: React.FC = () => {
         {/* إضافة قسم E-Voucher قبل سجل التدفق النقدي */}
         {eVoucherSummary && (
           <div className="mb-8 bg-gray-50 p-5 rounded-xl border border-gray-100">
-            <h3 className="text-xl font-semibold mb-4 text-right text-gray-700">ملخص عمليات E-Voucher</h3>
+            <h3 className="text-xl font-semibold mb-4 text-right text-gray-700">
+              ملخص عمليات E-Voucher 
+              {importedFileName && (
+                <span className="text-sm text-gray-500 mr-2">
+                  ({importedFileName})
+                </span>
+              )}
+            </h3>
             <EVoucherSummary summary={eVoucherSummary} />
           </div>
         )}
@@ -798,6 +882,14 @@ export const P2PFlowTab: React.FC = () => {
                             <li key={`${record.id}-${currency}`}>
                               <span className="font-medium">{currency}: </span>
                               {formatCurrency(balance, currency)}
+                              {record.costInfo[currency] && (
+                                <span className="text-xs text-gray-500 mr-2">
+                                  (متوسط السعر: {record.costInfo[currency].weightedAvgRate.toFixed(4)} 
+                                  {currency === 'USDT' ? ' AED/USDT' : 
+                                   currency === 'EGP' ? ' AED/EGP' : 
+                                   ' ' + currency + '/USDT'})
+                                </span>
+                              )}
                             </li>
                           ))}
                         </ul>
@@ -805,6 +897,82 @@ export const P2PFlowTab: React.FC = () => {
                     </tr>
                   ))}
                 </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        
+        {/* قسم إحصائيات المعاملات */}
+        {transactions.length > 0 && (
+          <div className="my-8 bg-green-50 border border-green-100 p-5 rounded-xl">
+            <h3 className="text-xl font-semibold mb-4 text-right text-green-800">
+              إحصائيات المعاملات
+              {importedFileName && (
+                <span className="text-sm text-gray-500 mr-2">
+                  ({importedFileName})
+                </span>
+              )}
+            </h3>
+            <div className="overflow-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-green-100">
+                    <th className="border border-green-200 p-2 text-right">نوع المعاملة</th>
+                    <th className="border border-green-200 p-2 text-center">إجمالي</th>
+                    <th className="border border-green-200 p-2 text-center">مكتملة</th>
+                    <th className="border border-green-200 p-2 text-center">ملغاة</th>
+                    <th className="border border-green-200 p-2 text-center">معلقة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-green-200 p-2 text-right font-medium">P2P</td>
+                    <td className="border border-green-200 p-2 text-center">
+                      {transactions.filter(t => t.tradeType === 'P2P').length}
+                    </td>
+                    <td className="border border-green-200 p-2 text-center">
+                      {transactions.filter(t => t.tradeType === 'P2P' && t.status === 'COMPLETED').length}
+                    </td>
+                    <td className="border border-green-200 p-2 text-center">
+                      {transactions.filter(t => t.tradeType === 'P2P' && t.status === 'CANCELLED').length}
+                    </td>
+                    <td className="border border-green-200 p-2 text-center">
+                      {transactions.filter(t => t.tradeType === 'P2P' && t.status === 'PENDING').length}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-green-200 p-2 text-right font-medium">E-Voucher</td>
+                    <td className="border border-green-200 p-2 text-center">
+                      {transactions.filter(t => t.tradeType === 'E-Voucher').length}
+                    </td>
+                    <td className="border border-green-200 p-2 text-center">
+                      {transactions.filter(t => t.tradeType === 'E-Voucher' && t.status === 'COMPLETED').length}
+                    </td>
+                    <td className="border border-green-200 p-2 text-center">
+                      {transactions.filter(t => t.tradeType === 'E-Voucher' && t.status === 'CANCELLED').length}
+                    </td>
+                    <td className="border border-green-200 p-2 text-center">
+                      {transactions.filter(t => t.tradeType === 'E-Voucher' && t.status === 'PENDING').length}
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr className="bg-green-100">
+                    <td className="border border-green-200 p-2 text-right font-bold">الإجمالي</td>
+                    <td className="border border-green-200 p-2 text-center font-bold">
+                      {transactions.length}
+                    </td>
+                    <td className="border border-green-200 p-2 text-center font-bold">
+                      {transactions.filter(t => t.status === 'COMPLETED').length}
+                    </td>
+                    <td className="border border-green-200 p-2 text-center font-bold">
+                      {transactions.filter(t => t.status === 'CANCELLED').length}
+                    </td>
+                    <td className="border border-green-200 p-2 text-center font-bold">
+                      {transactions.filter(t => t.status === 'PENDING').length}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>

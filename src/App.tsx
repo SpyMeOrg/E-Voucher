@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { read, utils } from 'xlsx';
 import { exportToExcel } from './utils/excelExport';
 import { BinanceTab } from './features/binance/components/BinanceTab';
@@ -38,7 +38,16 @@ export default function App() {
   const [result, setResult] = useState<CalculationResult | null>(null);
   // إضافة حالة لتخزين البيانات المستوردة
   const [importedData, setImportedData] = useState<ImportedRow[]>([]);
-  const [activeTab, setActiveTab] = useState<'calculator' | 'binance' | 'average-price' | 'batch-analyzer' | 'local-mode' | 'p2p-flow'>('calculator');
+  const [activeTab, setActiveTab] = useState<'calculator' | 'binance' | 'average-price' | 'batch-analyzer' | 'local-mode' | 'p2p-flow'>(() => {
+    // استرجاع التبويب المخزن من localStorage عند تحميل الصفحة
+    const savedTab = localStorage.getItem('activeTab');
+    return (savedTab as 'calculator' | 'binance' | 'average-price' | 'batch-analyzer' | 'local-mode' | 'p2p-flow') || 'calculator';
+  });
+
+  // حفظ التبويب النشط في localStorage عند تغييره
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
 
   const calculateResults = () => {
     // التحقق من وجود مبالغ مدخلة فقط
@@ -272,48 +281,198 @@ export default function App() {
     <div className="bg-gradient-to-br from-blue-50 to-violet-50 min-h-screen pb-16">
       <div className="container mx-auto px-4 py-8">
         <div className="pb-6">
-          <div className="text-center mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4">آلة حاسبة لتحويل العملات</h1>
-            <p className="text-gray-600 max-w-2xl mx-auto">أداة مساعدة لحساب وتحليل عمليات تحويل العملات وتقدير الأرباح</p>
+          <div className="relative text-center mb-12">
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-36 h-36 rounded-full bg-gradient-to-r from-violet-400/20 to-indigo-500/20 blur-3xl -z-10"></div>
+            
+            <h1 className="relative inline-block mb-4">
+              <span className="absolute -inset-1 -skew-y-3 bg-indigo-100 rounded-xl -z-10"></span>
+              <span className="relative inline-block text-3xl sm:text-4xl font-extrabold bg-gradient-to-br from-violet-700 to-indigo-900 text-transparent bg-clip-text pb-1">
+                آلة حاسبة لتحويل العملات
+              </span>
+              <span className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-violet-500 to-indigo-600"></span>
+            </h1>
+            
+            <p className="text-gray-600 text-lg max-w-2xl mx-auto leading-relaxed mb-1">
+              أداة مساعدة لحساب وتحليل عمليات تحويل العملات وتقدير الأرباح
+            </p>
+            
+            <div className="flex justify-center space-x-1 mt-2">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+            </div>
           </div>
 
-          <div className="border-b border-gray-200">
-            <nav className="flex flex-wrap justify-center -mb-px space-x-4 sm:space-x-8">
+          <div className="bg-white/30 backdrop-blur-md rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-white/60 mx-auto max-w-5xl mb-8 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-violet-500/5 via-blue-500/5 to-emerald-500/5 z-0"></div>
+            <nav className="flex overflow-x-auto hide-scrollbar px-2 py-2 space-x-3 justify-center relative z-10">
               <button
                 onClick={() => setActiveTab('calculator')}
-                className={`border-b-2 ${activeTab === 'calculator' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
+                className={`group relative flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm md:text-base font-medium transition-all duration-300 ${
+                  activeTab === 'calculator'
+                    ? 'bg-gradient-to-br from-violet-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/30 scale-105'
+                    : 'text-gray-700 hover:bg-white/80 hover:shadow-md'
+                }`}
               >
-                الصفحة الرئيسية
+                {activeTab === 'calculator' && (
+                  <span className="absolute inset-0 bg-white/10 rounded-xl animate-pulse-slow opacity-60"></span>
+                )}
+                <div className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full ${
+                  activeTab === 'calculator' ? 'bg-white/20' : 'bg-indigo-100'
+                } transition-colors duration-200`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${
+                    activeTab === 'calculator' ? 'text-white' : 'text-indigo-600'
+                  } transition-colors duration-200`} viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                  </svg>
+                </div>
+                <span className="relative">
+                  الصفحة الرئيسية
+                  {activeTab === 'calculator' && (
+                    <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-white/70 rounded-full opacity-70"></span>
+                  )}
+                </span>
               </button>
+              
               <button
                 onClick={() => setActiveTab('binance')}
-                className={`border-b-2 ${activeTab === 'binance' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
+                className={`group relative flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm md:text-base font-medium transition-all duration-300 ${
+                  activeTab === 'binance'
+                    ? 'bg-gradient-to-br from-violet-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/30 scale-105'
+                    : 'text-gray-700 hover:bg-white/80 hover:shadow-md'
+                }`}
               >
-                بينانس P2P
+                {activeTab === 'binance' && (
+                  <span className="absolute inset-0 bg-white/10 rounded-xl animate-pulse-slow opacity-60"></span>
+                )}
+                <div className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full ${
+                  activeTab === 'binance' ? 'bg-white/20' : 'bg-indigo-100'
+                } transition-colors duration-200`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${
+                    activeTab === 'binance' ? 'text-white' : 'text-indigo-600'
+                  } transition-colors duration-200`} viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="relative">
+                  بينانس P2P
+                  {activeTab === 'binance' && (
+                    <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-white/70 rounded-full opacity-70"></span>
+                  )}
+                </span>
               </button>
+              
               <button
                 onClick={() => setActiveTab('average-price')}
-                className={`border-b-2 ${activeTab === 'average-price' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
+                className={`group relative flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm md:text-base font-medium transition-all duration-300 ${
+                  activeTab === 'average-price'
+                    ? 'bg-gradient-to-br from-violet-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/30 scale-105'
+                    : 'text-gray-700 hover:bg-white/80 hover:shadow-md'
+                }`}
               >
-                حساب متوسط السعر
+                {activeTab === 'average-price' && (
+                  <span className="absolute inset-0 bg-white/10 rounded-xl animate-pulse-slow opacity-60"></span>
+                )}
+                <div className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full ${
+                  activeTab === 'average-price' ? 'bg-white/20' : 'bg-indigo-100'
+                } transition-colors duration-200`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${
+                    activeTab === 'average-price' ? 'text-white' : 'text-indigo-600'
+                  } transition-colors duration-200`} viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7zm-3 1a1 1 0 10-2 0v3a1 1 0 102 0V8zM8 9a1 1 0 00-2 0v2a1 1 0 102 0V9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="relative">
+                  متوسط السعر
+                  {activeTab === 'average-price' && (
+                    <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-white/70 rounded-full opacity-70"></span>
+                  )}
+                </span>
               </button>
+              
               <button
                 onClick={() => setActiveTab('batch-analyzer')}
-                className={`border-b-2 ${activeTab === 'batch-analyzer' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
+                className={`group relative flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm md:text-base font-medium transition-all duration-300 ${
+                  activeTab === 'batch-analyzer'
+                    ? 'bg-gradient-to-br from-violet-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/30 scale-105'
+                    : 'text-gray-700 hover:bg-white/80 hover:shadow-md'
+                }`}
               >
-                تحليل ملفات متعددة
+                {activeTab === 'batch-analyzer' && (
+                  <span className="absolute inset-0 bg-white/10 rounded-xl animate-pulse-slow opacity-60"></span>
+                )}
+                <div className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full ${
+                  activeTab === 'batch-analyzer' ? 'bg-white/20' : 'bg-indigo-100'
+                } transition-colors duration-200`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${
+                    activeTab === 'batch-analyzer' ? 'text-white' : 'text-indigo-600'
+                  } transition-colors duration-200`} viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+                  </svg>
+                </div>
+                <span className="relative">
+                  تحليل ملفات
+                  {activeTab === 'batch-analyzer' && (
+                    <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-white/70 rounded-full opacity-70"></span>
+                  )}
+                </span>
               </button>
+              
               <button
                 onClick={() => setActiveTab('local-mode')}
-                className={`border-b-2 ${activeTab === 'local-mode' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
+                className={`group relative flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm md:text-base font-medium transition-all duration-300 ${
+                  activeTab === 'local-mode'
+                    ? 'bg-gradient-to-br from-violet-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/30 scale-105'
+                    : 'text-gray-700 hover:bg-white/80 hover:shadow-md'
+                }`}
               >
-                الوضع المحلي
+                {activeTab === 'local-mode' && (
+                  <span className="absolute inset-0 bg-white/10 rounded-xl animate-pulse-slow opacity-60"></span>
+                )}
+                <div className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full ${
+                  activeTab === 'local-mode' ? 'bg-white/20' : 'bg-indigo-100'
+                } transition-colors duration-200`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${
+                    activeTab === 'local-mode' ? 'text-white' : 'text-indigo-600'
+                  } transition-colors duration-200`} viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.8 6.5 10.866a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="relative">
+                  الوضع المحلي
+                  {activeTab === 'local-mode' && (
+                    <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-white/70 rounded-full opacity-70"></span>
+                  )}
+                </span>
               </button>
+              
               <button
                 onClick={() => setActiveTab('p2p-flow')}
-                className={`border-b-2 ${activeTab === 'p2p-flow' ? 'border-blue-500 py-4 px-1 text-sm font-medium text-blue-600' : 'border-transparent py-4 px-1 text-sm font-medium text-gray-600 hover:text-blue-600'} whitespace-nowrap`}
+                className={`group relative flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm md:text-base font-medium transition-all duration-300 ${
+                  activeTab === 'p2p-flow'
+                    ? 'bg-gradient-to-br from-violet-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/30 scale-105'
+                    : 'text-gray-700 hover:bg-white/80 hover:shadow-md'
+                }`}
               >
-                سجل التدفق النقدي
+                {activeTab === 'p2p-flow' && (
+                  <span className="absolute inset-0 bg-white/10 rounded-xl animate-pulse-slow opacity-60"></span>
+                )}
+                <div className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full ${
+                  activeTab === 'p2p-flow' ? 'bg-white/20' : 'bg-indigo-100'
+                } transition-colors duration-200`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${
+                    activeTab === 'p2p-flow' ? 'text-white' : 'text-indigo-600'
+                  } transition-colors duration-200`} viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <span className="relative">
+                  التدفق النقدي
+                  {activeTab === 'p2p-flow' && (
+                    <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-white/70 rounded-full opacity-70"></span>
+                  )}
+                </span>
               </button>
             </nav>
           </div>
